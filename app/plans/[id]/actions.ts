@@ -83,7 +83,6 @@ export async function addExerciseToPlan(
 
   const resolvedSets = sets ?? exercise.defaultSets;
   const resolvedRest = rest ?? exercise.restSeconds;
-  const resolvedGoal = goal ?? exercise.repGoal;
 
   const createWithOrder = async (order: number) =>
     prisma.planExercise.create({

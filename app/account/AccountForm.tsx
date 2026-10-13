@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateAccount, updatePassword, type AccountInput } from "./actions";
+import { updateAccount, updatePassword, deleteAccount, type AccountInput } from "./actions";
 import { fullSignOut } from "@/lib/sign-out";
 
 const SEX_OPTIONS = [
-  { value: "man", label: "Man" },
-  { value: "vrouw", label: "Vrouw" },
-  { value: "anders", label: "Anders" },
+  { value: "man", label: "Male" },
+  { value: "vrouw", label: "Female" },
+  { value: "anders", label: "Other" },
 ] as const;
 
 const fieldClass =
@@ -27,6 +27,10 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
   const [nextPassword, setNextPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [savingPassword, setSavingPassword] = useState(false);
+
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   function updateField(field: keyof AccountInput, value: string) {
     setProfile((current) => ({ ...current, [field]: value }));
@@ -68,6 +72,24 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
     await fullSignOut();
   }
 
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const result = await deleteAccount();
+      if (result && "error" in result) {
+        setDeleteError(typeof result.error === "string" ? result.error : "Delete failed. Try again.");
+        setDeleting(false);
+        return;
+      }
+    } catch {
+      setDeleteError("Delete failed. Try again.");
+      setDeleting(false);
+      return;
+    }
+    await fullSignOut();
+  }
+
   return (
     <div className="space-y-3.5">
       <section className="bg-[#141416] border border-white/[0.08] rounded-[34px] px-6 py-8 text-center shadow-[0_16px_36px_rgba(0,0,0,0.25)] space-y-3">
@@ -82,12 +104,12 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
         className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]"
       >
         <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase px-1">
-          Profiel
+          Profile
         </span>
 
         <label className="block space-y-1.5">
           <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-            Gebruikersnaam
+            Username
           </span>
           <input
             value={profile.name}
@@ -99,7 +121,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
 
         <label className="block space-y-1.5">
           <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-            E-mail
+            Email
           </span>
           <input
             type="email"
@@ -113,7 +135,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
         {emailChanged && (
           <label className="block space-y-1.5">
             <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-              Huidig wachtwoord
+              Current password
             </span>
             <input
               type="password"
@@ -123,7 +145,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
               className={fieldClass}
             />
             <span className="px-1 block text-[12px] text-[#a1a1aa]">
-              Nodig om je e-mail te wijzigen. Je wordt daarna uitgelogd.
+              Needed to change your email. You will be signed out afterwards.
             </span>
           </label>
         )}
@@ -131,7 +153,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
         <div className="grid grid-cols-2 gap-3">
           <label className="block space-y-1.5">
             <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-              Leeftijd
+              Age
             </span>
             <input
               type="number"
@@ -146,7 +168,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
           </label>
           <label className="block space-y-1.5">
             <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-              Lengte (cm)
+              Height (cm)
             </span>
             <input
               type="number"
@@ -163,7 +185,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
 
         <div className="space-y-1.5">
           <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-            Geslacht
+            Sex
           </span>
           <div className="grid grid-cols-3 gap-2">
             {SEX_OPTIONS.map((option) => {
@@ -188,7 +210,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
 
         <label className="block space-y-1.5">
           <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-            Gewicht (kg)
+            Weight (kg)
           </span>
           <input
             type="number"
@@ -206,7 +228,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
           <p className="px-1 text-[13px] text-red-300">{profileError}</p>
         )}
         {profileSaved && (
-          <p className="px-1 text-[13px] text-[#baa3d0]">Opgeslagen</p>
+          <p className="px-1 text-[13px] text-[#baa3d0]">Saved</p>
         )}
 
         <button
@@ -214,7 +236,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
           disabled={savingProfile}
           className="w-full bg-[#baa3d0] text-[#141416] rounded-full py-3.5 font-editorial text-[18px] tracking-wider disabled:opacity-50 apple-press"
         >
-          {savingProfile ? "OPSLAAN..." : "PROFIEL OPSLAAN"}
+          {savingProfile ? "SAVING..." : "SAVE PROFILE"}
         </button>
       </form>
 
@@ -223,12 +245,12 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
         className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]"
       >
         <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase px-1">
-          Wachtwoord
+          Password
         </span>
 
         <label className="block space-y-1.5">
           <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-            Huidig wachtwoord
+            Current password
           </span>
           <input
             type="password"
@@ -241,7 +263,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
 
         <label className="block space-y-1.5">
           <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-            Nieuw wachtwoord
+            New password
           </span>
           <input
             type="password"
@@ -256,7 +278,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
           <p className="px-1 text-[13px] text-red-300">{passwordError}</p>
         )}
         <p className="px-1 text-[12px] text-[#a1a1aa]">
-          Na een wijziging word je op dit apparaat en op andere sessies uitgelogd.
+          After a change you are signed out on this device and other sessions.
         </p>
 
         <button
@@ -264,7 +286,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
           disabled={savingPassword}
           className="w-full bg-[#1b1b1e] border border-white/[0.08] text-white rounded-full py-3.5 font-editorial text-[18px] tracking-wider disabled:opacity-50 apple-press"
         >
-          {savingPassword ? "OPSLAAN..." : "WACHTWOORD WIJZIGEN"}
+          {savingPassword ? "SAVING..." : "CHANGE PASSWORD"}
         </button>
       </form>
 
@@ -275,8 +297,52 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
         }}
         className="w-full text-[13px] font-semibold tracking-wider text-[#71717a] uppercase py-3 apple-press"
       >
-        Uitloggen
+        Log out
       </button>
+
+      <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
+        <span className="text-[11px] font-semibold tracking-[0.18em] text-red-300 uppercase px-1">
+          Danger zone
+        </span>
+        {!confirmingDelete ? (
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteError(null);
+              setConfirmingDelete(true);
+            }}
+            className="w-full text-[13px] font-semibold tracking-wider text-red-300/70 uppercase py-2 apple-press"
+          >
+            Delete account
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <p className="px-1 text-[13px] text-[#a1a1aa]">
+              This permanently deletes your account and all your data: plans, exercises, schedule,
+              workouts and notifications. This cannot be undone.
+            </p>
+            {deleteError && <p className="px-1 text-[13px] text-red-300">{deleteError}</p>}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 bg-red-400/90 text-[#141416] font-semibold py-3 rounded-2xl text-[12px] uppercase tracking-wider apple-press disabled:opacity-50"
+              >
+                {deleting ? "DELETING..." : "DELETE EVERYTHING"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(false)}
+                disabled={deleting}
+                className="px-4 bg-[#1b1b1e] border border-white/[0.04] text-[#a1a1aa] py-3 rounded-2xl text-[12px] uppercase tracking-wider disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

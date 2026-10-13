@@ -168,3 +168,20 @@ export async function updatePassword(currentPassword: string, nextPassword: stri
 
   return { success: true };
 }
+
+export async function deleteAccount() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new Error("Not signed in");
+
+  const owned = await prisma.user.findFirst({
+    where: { id: session.user.id },
+    select: { id: true },
+  });
+  if (!owned) return { error: "Account not found." };
+
+  // All user data cascades off the user row.
+  await prisma.user.delete({ where: { id: owned.id } });
+
+  refreshUserCache(owned.id);
+  return { success: true as const };
+}
