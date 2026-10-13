@@ -1,6 +1,6 @@
 export default function AnalyticsLoading() {
   return (
-    <div className="min-h-screen bg-[#baa3d0] text-white pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 px-4 select-none" aria-busy="true">
+    <div className="min-h-dvh bg-[#baa3d0] text-white pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 px-4 select-none" aria-busy="true">
       <main className="max-w-sm mx-auto space-y-3.5">
         <div className="h-10 w-44 bg-[#141416] rounded-full animate-pulse" />
         <div className="grid grid-cols-2 gap-3.5">

@@ -22,7 +22,7 @@ export default async function ActiveWorkoutPage({ searchParams }: PageProps) {
   const workout = await getActiveWorkout(session.user.id, effectivePlanId ?? undefined);
 
   return (
-    <div className="min-h-screen bg-[#baa3d0] text-white pb-10 pt-4 px-4 select-none">
+    <div className="min-h-dvh bg-[#baa3d0] text-white pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 px-4 select-none">
       <main className="max-w-sm mx-auto space-y-3.5">
         {workout.exercises.length === 0 ? (
           <>

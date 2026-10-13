@@ -46,7 +46,7 @@ export default function OnboardingForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#baa3d0] px-4 py-10 flex items-center justify-center select-none">
+    <div className="min-h-dvh bg-[#baa3d0] px-4 py-10 flex items-center justify-center select-none">
       <main className="w-full max-w-sm space-y-4">
         <div className="text-center pb-1">
           <h1 className="font-editorial text-[56px] text-[#141416] leading-none">PROFILE</h1>

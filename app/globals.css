@@ -9,7 +9,7 @@ html,
 body {
   background-color: #baa3d0;
   color-scheme: light;
-  overscroll-behavior-x: none;
+  overscroll-behavior: none;
 }
 
 body {
@@ -49,7 +49,7 @@ textarea {
 }
 
 #page-root {
-  min-height: 100vh;
+  min-height: 100dvh;
   background: #baa3d0;
   touch-action: pan-y;
 }

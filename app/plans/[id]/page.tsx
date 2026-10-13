@@ -76,7 +76,7 @@ export default async function EditPlanPage({ params }: PageProps) {
   }));
 
   return (
-    <div className="min-h-screen bg-[#baa3d0] text-white pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 px-4 select-none">
+    <div className="min-h-dvh bg-[#baa3d0] text-white pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 px-4 select-none">
       <main className="max-w-sm mx-auto space-y-3.5">
         <SubpageHeader title="Edit plan" href="/schedule" />
 

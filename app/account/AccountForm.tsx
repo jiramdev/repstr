@@ -295,54 +295,52 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
         onClick={async () => {
           await fullSignOut();
         }}
-        className="w-full text-[13px] font-semibold tracking-wider text-[#71717a] uppercase py-3 apple-press"
+        className="w-full bg-[#1b1b1e] border border-white/[0.08] text-white rounded-full py-3.5 font-editorial text-[18px] tracking-wider apple-press"
       >
-        Log out
+        LOG OUT
       </button>
 
-      <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-        <span className="text-[11px] font-semibold tracking-[0.18em] text-red-300 uppercase px-1">
-          Danger zone
-        </span>
-        {!confirmingDelete ? (
-          <button
-            type="button"
-            onClick={() => {
-              setDeleteError(null);
-              setConfirmingDelete(true);
-            }}
-            className="w-full text-[13px] font-semibold tracking-wider text-red-300/70 uppercase py-2 apple-press"
-          >
+      {!confirmingDelete ? (
+        <button
+          type="button"
+          onClick={() => {
+            setDeleteError(null);
+            setConfirmingDelete(true);
+          }}
+          className="w-full bg-[#1b1b1e] border border-white/[0.08] text-red-300 rounded-full py-3.5 font-editorial text-[18px] tracking-wider apple-press"
+        >
+          DELETE ACCOUNT
+        </button>
+      ) : (
+        <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
+          <span className="text-[11px] font-semibold tracking-[0.18em] text-red-300 uppercase px-1">
             Delete account
-          </button>
-        ) : (
-          <div className="space-y-3">
-            <p className="px-1 text-[13px] text-[#a1a1aa]">
-              This permanently deletes your account and all your data: plans, exercises, schedule,
-              workouts and notifications. This cannot be undone.
-            </p>
-            {deleteError && <p className="px-1 text-[13px] text-red-300">{deleteError}</p>}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 bg-red-400/90 text-[#141416] font-semibold py-3 rounded-2xl text-[12px] uppercase tracking-wider apple-press disabled:opacity-50"
-              >
-                {deleting ? "DELETING..." : "DELETE EVERYTHING"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(false)}
-                disabled={deleting}
-                className="px-4 bg-[#1b1b1e] border border-white/[0.04] text-[#a1a1aa] py-3 rounded-2xl text-[12px] uppercase tracking-wider disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
+          </span>
+          <p className="px-1 text-[13px] text-[#a1a1aa]">
+            This permanently deletes your account and all your data: plans, exercises, schedule,
+            workouts and notifications. This cannot be undone.
+          </p>
+          {deleteError && <p className="px-1 text-[13px] text-red-300">{deleteError}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex-1 bg-red-400/90 text-[#141416] font-semibold py-3 rounded-2xl text-[12px] uppercase tracking-wider apple-press disabled:opacity-50"
+            >
+              {deleting ? "DELETING..." : "DELETE EVERYTHING"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(false)}
+              disabled={deleting}
+              className="px-4 bg-[#1b1b1e] border border-white/[0.04] text-[#a1a1aa] py-3 rounded-2xl text-[12px] uppercase tracking-wider disabled:opacity-50"
+            >
+              Cancel
+            </button>
           </div>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }

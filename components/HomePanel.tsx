@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, Play } from "lucide-react";
+import { Bell } from "lucide-react";
 import Prefetch from "@/components/Prefetch";
 import TabLink from "@/components/TabLink";
 
@@ -32,7 +32,7 @@ export default function HomePanel({
   const workoutHref = todayPlan ? `/workout/active?planId=${todayPlan.id}` : "/schedule";
 
   return (
-    <div className="min-h-screen bg-[#baa3d0] text-white pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 px-4 select-none">
+    <div className="min-h-dvh bg-[#baa3d0] text-white pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 px-4 select-none">
       <Prefetch hrefs={[workoutHref, "/notifications"]} />
       <main className="max-w-sm mx-auto space-y-3.5">
         <header className="flex justify-between items-center px-1 py-1">
@@ -65,6 +65,7 @@ export default function HomePanel({
           <Link
             href={workoutHref}
             prefetch={true}
+            aria-label="Start workout"
             className="block bg-[#141416] border border-white/[0.08] rounded-[34px] px-6 py-9 text-center space-y-3 relative overflow-hidden shadow-[0_16px_36px_rgba(0,0,0,0.25)] transition apple-press"
           >
             <p className="text-[12px] font-semibold tracking-[0.2em] text-[#baa3d0] uppercase">
@@ -76,10 +77,6 @@ export default function HomePanel({
             <p className="text-[14px] text-[#a1a1aa] font-medium tracking-tight">
               {todayPlan.exerciseCount} exercises scheduled
             </p>
-            <span className="inline-flex items-center gap-2 bg-[#baa3d0] text-[#141416] rounded-full px-5 py-3 font-editorial text-[16px] tracking-wider">
-              <Play className="w-4 h-4 fill-current" />
-              START WORKOUT
-            </span>
           </Link>
         ) : (
           <TabLink

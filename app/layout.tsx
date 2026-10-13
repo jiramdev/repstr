@@ -96,7 +96,7 @@ export default function RootLayout({
   return (
     <html lang="en" style={{ backgroundColor: "#baa3d0", colorScheme: "light" }}>
       <body
-        className={`${inter.variable} ${anton.variable} font-sans antialiased min-h-screen selection:bg-[#141416] selection:text-[#baa3d0]`}
+        className={`${inter.variable} ${anton.variable} font-sans antialiased min-h-dvh selection:bg-[#141416] selection:text-[#baa3d0]`}
         style={{ backgroundColor: "#baa3d0", colorScheme: "light" }}
       >
         <style>{`

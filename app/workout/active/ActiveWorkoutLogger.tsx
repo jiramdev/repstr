@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { motion } from "motion/react";
 import { popTransition } from "@/lib/motion";
 import { secondsRemaining as remainingSeconds } from "@/lib/notifications";
@@ -665,23 +665,6 @@ export default function ActiveWorkoutLogger({
     [rowsByExercise, persistRows, sessionId, previousSets, drainOutbox, startRestTimer]
   );
 
-  const handleDelete = useCallback(
-    (exercise: Exercise, setIndex: number) => {
-      const rows = rowsByExercise[exercise.id];
-      const current = rows?.[setIndex];
-      if (!rows || !current || !sessionId) return;
-      const nextRows = rows.filter((_, idx) => idx !== setIndex);
-      persistRows({ ...rowsByExercise, [exercise.id]: nextRows.length ? nextRows : emptyRows(1) });
-      if (current.entryId) {
-        const entryId = current.entryId;
-        enqueueOp({ kind: "delete", clientKey: current.key, sessionId, entryId })
-          .then(() => drainOutbox(sessionId))
-          .catch((err) => console.error("Failed to delete set:", err));
-      }
-    },
-    [rowsByExercise, persistRows, sessionId, drainOutbox]
-  );
-
   const handleAddSet = useCallback(
     (exercise: Exercise) => {
       const rows = rowsByExercise[exercise.id] ?? [];
@@ -741,19 +724,20 @@ export default function ActiveWorkoutLogger({
         return;
       }
       const result = await finishWorkoutSession(sessionId);
-      if (!("success" in result)) {
-        setSaveError(result.error ?? "Save failed.");
+      if (!("success" in result) || typeof result.sessionId !== "string") {
+        setSaveError(!("success" in result) ? result.error : "Save failed.");
         setFinishing(false);
         return;
       }
+      stopTimer();
+      clearDrafts();
+      router.push(`/workout/summary/${result.sessionId}`);
+      return;
     } catch {
       setSaveError("Save failed. Your sets are still on this device.");
       setFinishing(false);
       return;
     }
-    stopTimer();
-    clearDrafts();
-    router.push("/");
   };
 
   const handleAbandon = async () => {
@@ -772,13 +756,18 @@ export default function ActiveWorkoutLogger({
 
   const exercise = exercises[step];
   const rows = exercise ? (rowsByExercise[exercise.id] ?? []) : [];
-  const doneCount = rows.filter((row) => row.isCompleted).length;
-  const currentSetNumber = Math.min(doneCount + 1, Math.max(rows.length, 1));
+  const isLastStep = exercises.length > 0 && step >= exercises.length - 1;
   const previous = exercise?.exerciseId ? previousSets[exercise.exerciseId] : undefined;
 
   return (
     <div className="space-y-3.5">
       <header className="flex items-center justify-between px-1 py-1">
+        <div className="h-10 bg-[#141416] border border-white/[0.08] px-4 rounded-full flex items-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
+          <span className="w-2 h-2 rounded-full bg-[#baa3d0]" />
+          <span className="font-editorial text-[14px] tracking-wider text-white leading-none uppercase">
+            Exercise {exercises.length ? step + 1 : 0} of {exercises.length}
+          </span>
+        </div>
         <button
           type="button"
           onClick={handleAbandon}
@@ -788,17 +777,6 @@ export default function ActiveWorkoutLogger({
         >
           <X className="w-5 h-5 stroke-[1.8]" />
         </button>
-        <div className="h-10 bg-[#141416] border border-white/[0.08] px-4 rounded-full flex items-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
-          <span className="w-2 h-2 rounded-full bg-[#baa3d0]" />
-          <span className="font-editorial text-[14px] tracking-wider text-white leading-none uppercase">
-            Exercise {exercises.length ? step + 1 : 0} of {exercises.length}
-          </span>
-        </div>
-        <div className="h-10 bg-[#141416] border border-white/[0.08] px-4 rounded-full flex items-center shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
-          <span className="font-editorial text-[14px] tracking-wider text-white leading-none uppercase">
-            Set {currentSetNumber} of {Math.max(rows.length, 1)}
-          </span>
-        </div>
       </header>
 
       <RestTimer key={restTarget ?? "off"} target={restTarget} onSkip={skipRest} onExpire={clearTimer} />
@@ -815,32 +793,10 @@ export default function ActiveWorkoutLogger({
           previousSets={previous}
           onUpdate={(idx, field, value) => handleUpdate(exercise.id, idx, field, value)}
           onToggle={(idx) => handleToggleSet(exercise, idx)}
-          onDelete={(idx) => handleDelete(exercise, idx)}
           onAddSet={() => handleAddSet(exercise)}
           onSameAsLast={() => handleSameAsLast(exercise)}
         />
       )}
-
-      <nav className="flex items-center gap-2.5" aria-label="Exercises">
-        <button
-          type="button"
-          onClick={() => goStep(step - 1)}
-          disabled={step === 0 || starting}
-          className="flex-1 bg-[#141416] border border-white/[0.08] rounded-full py-3.5 flex items-center justify-center gap-1 text-white apple-press disabled:opacity-40"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          <span className="font-editorial text-[15px] tracking-wider uppercase leading-none">Previous</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => goStep(step + 1)}
-          disabled={step >= exercises.length - 1 || starting}
-          className="flex-1 bg-[#141416] border border-white/[0.08] rounded-full py-3.5 flex items-center justify-center gap-1 text-white apple-press disabled:opacity-40"
-        >
-          <span className="font-editorial text-[15px] tracking-wider uppercase leading-none">Next</span>
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </nav>
 
       {saveError && (
         <p role="alert" className="px-1 text-[13px] text-red-300">
@@ -848,21 +804,46 @@ export default function ActiveWorkoutLogger({
         </p>
       )}
 
-      <div className="h-24" aria-hidden="true" />
-
       <div
         className="fixed bottom-0 left-0 right-0 z-50 px-4 pt-6 bg-gradient-to-t from-[#baa3d0] via-[#baa3d0]/95 to-transparent"
-        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
-        <button
-          onClick={handleFinish}
-          disabled={isFinishing || starting}
-          className="w-full max-w-sm mx-auto block bg-[#141416] border border-white/[0.08] rounded-[30px] py-4 text-center transition apple-press shadow-[0_12px_28px_rgba(0,0,0,0.2)] disabled:opacity-50"
+        <nav
+          aria-label="Exercises"
+          className="w-full max-w-sm mx-auto flex items-center gap-2.5"
         >
-          <span className="font-editorial text-[20px] tracking-wider text-[#baa3d0] uppercase leading-none block">
-            {isFinishing ? "SAVING..." : "FINISH WORKOUT"}
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={() => goStep(step - 1)}
+            disabled={step === 0 || starting || isFinishing}
+            className="flex-1 bg-[#141416] border border-white/[0.08] rounded-full py-3.5 flex items-center justify-center gap-1 text-white apple-press disabled:opacity-40 shadow-[0_12px_28px_rgba(0,0,0,0.2)]"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span className="font-editorial text-[15px] tracking-wider uppercase leading-none">Previous</span>
+          </button>
+          {isLastStep ? (
+            <button
+              type="button"
+              onClick={handleFinish}
+              disabled={isFinishing || starting}
+              className="flex-1 bg-[#141416] border border-white/[0.08] rounded-full py-3.5 flex items-center justify-center gap-1 apple-press disabled:opacity-40 shadow-[0_12px_28px_rgba(0,0,0,0.2)]"
+            >
+              <span className="font-editorial text-[15px] tracking-wider uppercase leading-none text-[#baa3d0]">
+                {isFinishing ? "SAVING..." : "FINISH WORKOUT"}
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => goStep(step + 1)}
+              disabled={starting || isFinishing}
+              className="flex-1 bg-[#141416] border border-white/[0.08] rounded-full py-3.5 flex items-center justify-center gap-1 text-white apple-press disabled:opacity-40 shadow-[0_12px_28px_rgba(0,0,0,0.2)]"
+            >
+              <span className="font-editorial text-[15px] tracking-wider uppercase leading-none">Next</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
+        </nav>
       </div>
     </div>
   );
@@ -874,7 +855,6 @@ const ExerciseStep = memo(function ExerciseStep({
   previousSets,
   onUpdate,
   onToggle,
-  onDelete,
   onAddSet,
   onSameAsLast,
 }: {
@@ -883,7 +863,6 @@ const ExerciseStep = memo(function ExerciseStep({
   previousSets?: PreviousSet[];
   onUpdate: (setIndex: number, field: "weight" | "reps" | "duration", value: string) => void;
   onToggle: (setIndex: number) => void;
-  onDelete: (setIndex: number) => void;
   onAddSet: () => void;
   onSameAsLast: () => void;
 }) {
@@ -986,31 +965,19 @@ const ExerciseStep = memo(function ExerciseStep({
                 className="w-full bg-[#121214] border border-white/[0.06] rounded-xl py-2 text-center font-mono text-[15px] font-medium text-white outline-none placeholder:text-[#71717a] focus:border-[#baa3d0] disabled:opacity-40"
               />
 
-              <div className="flex items-center gap-1">
-                {isDone && (
-                  <button
-                    type="button"
-                    aria-label={`Delete set ${row.setNumber}`}
-                    onClick={() => onDelete(idx)}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-[#71717a] hover:text-red-300 apple-press"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  aria-pressed={isDone}
-                  aria-label={isDone ? `Set ${row.setNumber} checked off` : `Check off set ${row.setNumber}`}
-                  onClick={() => onToggle(idx)}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition apple-press ${
-                    isDone
-                      ? "bg-[#baa3d0] text-[#141416]"
-                      : "border border-white/20 text-transparent hover:border-[#baa3d0] hover:text-[#baa3d0]"
-                  }`}
-                >
-                  <Check className="w-4 h-4 stroke-[3]" />
-                </button>
-              </div>
+              <button
+                type="button"
+                aria-pressed={isDone}
+                aria-label={isDone ? `Set ${row.setNumber} checked off` : `Check off set ${row.setNumber}`}
+                onClick={() => onToggle(idx)}
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition apple-press ${
+                  isDone
+                    ? "bg-[#baa3d0] text-[#141416]"
+                    : "border border-white/20 text-transparent hover:border-[#baa3d0] hover:text-[#baa3d0]"
+                }`}
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+              </button>
             </div>
           );
         })}
@@ -1026,9 +993,6 @@ const ExerciseStep = memo(function ExerciseStep({
           <span className="text-[12px] font-semibold tracking-[0.14em] uppercase">Add set</span>
         </button>
       </div>
-      <p className="px-1 text-[11px] text-[#71717a]">
-        Tip: uncheck a set to edit it, or delete it with the trash icon.
-      </p>
     </section>
   );
 });

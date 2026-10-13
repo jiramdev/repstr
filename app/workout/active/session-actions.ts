@@ -169,7 +169,7 @@ export async function finishWorkoutSession(sessionId: string) {
 
   refreshUserCache(userId);
   revalidateTabs();
-  return { success: true as const };
+  return { success: true as const, sessionId: session.id };
 }
 
 export async function abandonWorkoutSession(sessionId: string) {

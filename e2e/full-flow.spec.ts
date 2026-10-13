@@ -104,7 +104,6 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   // 6. Workout, one exercise at a time.
   await page.goto(`/workout/active?planId=${planId}`);
   await expect(page.getByText("Exercise 1 of 3")).toBeVisible();
-  await expect(page.getByText("Set 1 of 2")).toBeVisible();
   // Bodyweight: no weight field, reps only.
   await expect(page.getByLabel(/weight in kilos/)).toHaveCount(0);
   await page.getByLabel("Set 1 reps").fill("10");
@@ -133,6 +132,11 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   await page.getByRole("button", { name: "Check off set 1" }).click();
   await page.getByRole("button", { name: "Skip rest" }).click();
   await page.getByRole("button", { name: "FINISH WORKOUT" }).click();
+  // Summary screen of the finished workout.
+  await expect(page).toHaveURL(/\/workout\/summary\/.+/);
+  await expect(page.getByText("E2E Plan").first()).toBeVisible();
+  await expect(page.getByText("5 sets · 480 kg")).toBeVisible();
+  await page.getByRole("link", { name: "DONE" }).click();
   await expect(page).toHaveURL("/");
 
   // 7. Second workout: placeholders from last time + "same as last time".
@@ -143,8 +147,15 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   await expect(
     page.getByRole("button", { name: "Same as last time" })
   ).toBeVisible();
-  // Finish empty (confirm dialog auto-accepted).
+  // Finish empty (confirm dialog auto-accepted) lands on its summary too.
+  // Finish only shows on the final exercise.
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByText("Exercise 3 of 3")).toBeVisible();
   await page.getByRole("button", { name: "FINISH WORKOUT" }).click();
+  await expect(page).toHaveURL(/\/workout\/summary\/.+/);
+  await expect(page.getByText("No sets logged")).toBeVisible();
+  await page.getByRole("link", { name: "DONE" }).click();
   await expect(page).toHaveURL("/");
 
   // 8. Stats show the finished workout.
@@ -156,4 +167,9 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   // Logging 60 kg gives a PR of 60 kg.
   await expect(page.getByText("E2E Bench").first()).toBeVisible();
   await expect(page.getByText("60", { exact: true }).first()).toBeVisible();
+  // Every history workout links to the same summary screen.
+  await page.locator("details summary").first().click();
+  await page.getByRole("link", { name: "View summary" }).first().click();
+  await expect(page).toHaveURL(/\/workout\/summary\/.+/);
+  await expect(page.getByText("E2E Plan").first()).toBeVisible();
 });

@@ -52,7 +52,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#baa3d0] px-4 py-10 flex items-center justify-center select-none">
+    <div className="min-h-dvh bg-[#baa3d0] px-4 py-10 flex items-center justify-center select-none">
       <main className="w-full max-w-sm space-y-4">
         <div className="text-center pb-1">
           <h1 className="brand-name text-[64px] text-[#141416] leading-none">repiq</h1>

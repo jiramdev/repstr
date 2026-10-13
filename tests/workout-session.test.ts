@@ -94,7 +94,7 @@ describe("workout sessions", () => {
   it("finish cancels only pending timers of the user's own session", async () => {
     workoutLogFindFirst.mockResolvedValue({ id: "session-a", planId: "plan-a" });
     const result = await finishWorkoutSession("session-a");
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual({ success: true, sessionId: "session-a" });
     expect(restTimerUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -133,7 +133,7 @@ describe("workout sessions", () => {
   it("finishing marks the session finished", async () => {
     workoutLogFindFirst.mockResolvedValue({ id: "session-a", planId: "plan-a" });
     const result = await finishWorkoutSession("session-a");
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual({ success: true, sessionId: "session-a" });
     expect(workoutLogUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "session-a" },
