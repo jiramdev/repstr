@@ -12,7 +12,7 @@ import { dayOfWeekSchema, idSchema, nameSchema } from "@/lib/validation";
 // 1. Koppel een plan aan een specifieke dag (0 = Zo, 1 = Ma ... 6 = Za)
 export async function assignPlanToDay(dayOfWeek: number, planId: string | null) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
 
   const parsed = z
     .object({ day: dayOfWeekSchema, planId: idSchema.nullable() })
@@ -63,7 +63,7 @@ export async function assignPlanToDay(dayOfWeek: number, planId: string | null) 
 // 2. Nieuw trainingsplan aanmaken
 export async function createWorkoutPlan(name: string) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
 
   const parsed = nameSchema.safeParse(name?.trim());
   if (!parsed.success) return null;

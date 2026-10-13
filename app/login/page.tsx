@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signInAllowed } from "@/app/actions/auth";
 
 const fieldClass =
   "w-full bg-[#1b1b1e] border border-white/[0.08] rounded-2xl px-4 py-3 text-[15px] text-white outline-none focus:border-[#baa3d0] placeholder:text-[#52525b]";
@@ -28,6 +29,13 @@ export default function LoginPage() {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
+    const allowed = await signInAllowed(email);
+    if (!allowed.allowed) {
+      setError(allowed.error);
+      setLoading(false);
+      return;
+    }
+
     const res = await signIn("credentials", {
       email,
       password,
@@ -35,7 +43,7 @@ export default function LoginPage() {
     });
 
     if (res?.error) {
-      setError("Ongeldig e-mailadres of wachtwoord.");
+      setError("Invalid email or password.");
       setLoading(false);
     } else {
       router.push(nextPath());
@@ -57,21 +65,21 @@ export default function LoginPage() {
         >
           <label className="block space-y-1.5">
             <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-              E-mail
+              Email
             </span>
             <input
               type="email"
               name="email"
               required
               autoComplete="email"
-              placeholder="naam@voorbeeld.nl"
+              placeholder="name@example.com"
               className={fieldClass}
             />
           </label>
 
           <label className="block space-y-1.5">
             <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-              Wachtwoord
+              Password
             </span>
             <input
               type="password"
@@ -90,14 +98,14 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-[#baa3d0] text-[#141416] rounded-full py-3.5 font-editorial text-[18px] tracking-wider disabled:opacity-50 apple-press"
           >
-            {loading ? "INLOGGEN..." : "INLOGGEN"}
+            {loading ? "LOGGING IN..." : "LOG IN"}
           </button>
         </form>
 
         <p className="text-center text-[13px] text-[#141416]/80">
-          Nog geen account?{" "}
+          No account yet?{" "}
           <Link href="/register" className="font-semibold text-[#141416] underline underline-offset-2">
-            Account maken
+            Create one
           </Link>
         </p>
       </main>

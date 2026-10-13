@@ -16,7 +16,7 @@ import { redirect } from "next/navigation";
 // 1. Naam van het plan bijwerken
 export async function updatePlanName(planId: string, name: string) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
 
   const parsed = z.object({ planId: idSchema, name: nameSchema }).safeParse({ planId, name: name?.trim() });
   if (!parsed.success) return;
@@ -44,7 +44,7 @@ export async function addExerciseToPlan(
   repGoal?: number | null
 ) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
 
   const userId = session.user.id;
   if (!idSchema.safeParse(planId).success) return { error: "Plan niet gevonden." };
@@ -128,7 +128,7 @@ export async function updateExercise(
   repGoal?: number | null
 ) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
 
   const parsed = z
     .object({
@@ -211,7 +211,7 @@ export async function updateExercise(
 
 export async function reorderExercises(planId: string, orderedIds: string[]) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
 
   const parsed = z.object({ planId: idSchema, orderedIds: z.array(idSchema).min(1).max(200) }).safeParse({ planId, orderedIds });
   if (!parsed.success) {
@@ -250,7 +250,7 @@ export async function reorderExercises(planId: string, orderedIds: string[]) {
 // 3. Oefening verwijderen uit het plan
 export async function removeExerciseFromPlan(planId: string, exerciseId: string) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
 
   const placement = await prisma.planExercise.findFirst({
     where: { id: exerciseId, planId, plan: { userId: session.user.id } },
@@ -271,7 +271,7 @@ export async function removeExerciseFromPlan(planId: string, exerciseId: string)
 // 4. Volledig trainingsplan verwijderen
 export async function deletePlan(planId: string) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
 
   const plan = await prisma.workoutPlan.findFirst({
     where: { id: planId, userId: session.user.id },

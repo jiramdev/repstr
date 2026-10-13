@@ -59,35 +59,35 @@ export default function RegisterPage() {
         >
           <label className="block space-y-1.5">
             <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-              Naam
+              Name
             </span>
             <input
               type="text"
               name="name"
               required
               autoComplete="name"
-              placeholder="Je naam"
+              placeholder="Your name"
               className={fieldClass}
             />
           </label>
 
           <label className="block space-y-1.5">
             <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-              E-mail
+              Email
             </span>
             <input
               type="email"
               name="email"
               required
               autoComplete="email"
-              placeholder="naam@voorbeeld.nl"
+              placeholder="name@example.com"
               className={fieldClass}
             />
           </label>
 
           <label className="block space-y-1.5">
             <span className="px-1 text-[11px] font-semibold tracking-wider text-[#71717a] uppercase">
-              Wachtwoord
+              Password
             </span>
             <input
               type="password"
@@ -95,7 +95,7 @@ export default function RegisterPage() {
               required
               minLength={8}
               autoComplete="new-password"
-              placeholder="minstens 8 tekens"
+              placeholder="at least 8 characters"
               className={fieldClass}
             />
           </label>
@@ -107,14 +107,14 @@ export default function RegisterPage() {
             disabled={loading}
             className="w-full bg-[#baa3d0] text-[#141416] rounded-full py-3.5 font-editorial text-[18px] tracking-wider disabled:opacity-50 apple-press"
           >
-            {loading ? "BEZIG..." : "REGISTREREN"}
+            {loading ? "SIGNING UP..." : "SIGN UP"}
           </button>
         </form>
 
         <p className="text-center text-[13px] text-[#141416]/80">
-          Heb je al een account?{" "}
+          Already have an account?{" "}
           <Link href="/login" className="font-semibold text-[#141416] underline underline-offset-2">
-            Inloggen
+            Log in
           </Link>
         </p>
       </main>

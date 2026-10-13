@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { passwordRuleError } from "@/lib/password";
-import { TOO_MANY_ATTEMPTS_NL, clientIp, limitSignUp } from "@/lib/rate-limit";
+import { TOO_MANY_ATTEMPTS_MESSAGE, clientIp, limitSignIn, limitSignUp } from "@/lib/rate-limit";
 import { z } from "zod";
 import { emailSchema } from "@/lib/validation";
 
@@ -23,7 +23,7 @@ export async function registerUser(formData: FormData) {
     });
 
   if (!parsed.success || !parsed.data.password) {
-    return { error: "E-mailadres en wachtwoord zijn verplicht." };
+    return { error: "Email and password are required." };
   }
   const { name, email, password } = parsed.data;
 
@@ -32,7 +32,7 @@ export async function registerUser(formData: FormData) {
 
   const ip = clientIp(await headers());
   if ((await limitSignUp(ip)).limited) {
-    return { error: TOO_MANY_ATTEMPTS_NL };
+    return { error: TOO_MANY_ATTEMPTS_MESSAGE };
   }
 
   const existing = await prisma.user.findUnique({
@@ -40,7 +40,7 @@ export async function registerUser(formData: FormData) {
   });
 
   if (existing) {
-    return { error: "Dit e-mailadres is al in gebruik." };
+    return { error: "This email address is already in use." };
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -64,10 +64,25 @@ export async function registerUser(formData: FormData) {
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return { error: "Dit e-mailadres is al in gebruik." };
+      return { error: "This email address is already in use." };
     }
     throw error;
   }
 
   return { success: true };
+}
+
+/**
+ * Pre-check for the login form so a rate-limited sign-in shows
+ * "Too many attempts, try again later" instead of a credentials error.
+ * The authorize() callback enforces the same limit.
+ */
+export async function signInAllowed(rawEmail: string) {
+  const parsed = emailSchema.safeParse(typeof rawEmail === "string" ? rawEmail : "");
+  if (!parsed.success) return { allowed: true as const };
+  const ip = clientIp(await headers());
+  if ((await limitSignIn(parsed.data, ip)).limited) {
+    return { allowed: false as const, error: TOO_MANY_ATTEMPTS_MESSAGE };
+  }
+  return { allowed: true as const };
 }

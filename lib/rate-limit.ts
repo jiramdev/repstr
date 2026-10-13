@@ -6,7 +6,7 @@ export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 export const REGISTER_ATTEMPT_LIMIT = 3;
 export const REGISTER_WINDOW_MS = 60 * 60 * 1000;
 
-export const TOO_MANY_ATTEMPTS_NL = "Te veel pogingen. Probeer het later opnieuw.";
+export const TOO_MANY_ATTEMPTS_MESSAGE = "Too many attempts, try again later.";
 
 type Bucket = { count: number; resetAt: number };
 

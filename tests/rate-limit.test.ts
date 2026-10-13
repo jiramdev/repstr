@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  TOO_MANY_ATTEMPTS_NL,
+  TOO_MANY_ATTEMPTS_MESSAGE,
   checkRateLimit,
   isRateLimited,
   limitSignIn,
@@ -63,6 +63,6 @@ describe("upstash rate limit fallback", () => {
   });
 
   it("uses the Dutch too-many-attempts message", () => {
-    expect(TOO_MANY_ATTEMPTS_NL).toBe("Te veel pogingen. Probeer het later opnieuw.");
+    expect(TOO_MANY_ATTEMPTS_MESSAGE).toBe("Too many attempts, try again later.");
   });
 });

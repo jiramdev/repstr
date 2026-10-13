@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+      return NextResponse.json({ error: "Not signed in" }, { status: 401 });
     }
     const userId = session.user.id;
 
@@ -162,7 +162,7 @@ export async function DELETE(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
+      return NextResponse.json({ error: "Not signed in" }, { status: 401 });
     }
 
     let body: unknown;

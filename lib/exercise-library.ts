@@ -1,9 +1,9 @@
 export type ExerciseTracking = "weight" | "reps" | "hold";
 
 export const TRACKING_OPTIONS: { id: ExerciseTracking; label: string }[] = [
-  { id: "weight", label: "Gewicht" },
-  { id: "reps", label: "Lichaamsgewicht" },
-  { id: "hold", label: "Statisch" },
+  { id: "weight", label: "Weight" },
+  { id: "reps", label: "Bodyweight" },
+  { id: "hold", label: "Hold" },
 ];
 
 export function isTracking(value: string | null | undefined): value is ExerciseTracking {

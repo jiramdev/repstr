@@ -18,6 +18,14 @@ body {
   letter-spacing: -0.015em;
 }
 
+/* iOS zooms when focusing inputs below 16px. Keep every form control at
+   16px; colors, borders and radii still come from the design tokens. */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
 .font-editorial {
   font-family: var(--font-anton), -apple-system, BlinkMacSystemFont, "Impact", sans-serif;
   letter-spacing: 0.02em;

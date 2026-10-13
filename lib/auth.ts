@@ -4,7 +4,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { sessionStillValid } from "@/lib/session-version";
-import { TOO_MANY_ATTEMPTS_NL, limitSignIn } from "@/lib/rate-limit";
+import { TOO_MANY_ATTEMPTS_MESSAGE, limitSignIn } from "@/lib/rate-limit";
 
 function ipFromAuthorizeReq(req: unknown) {
   const headers = (req as { headers?: Record<string, unknown> } | null)?.headers;
@@ -31,13 +31,13 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Vul een e-mail en wachtwoord in");
+          throw new Error("Enter your email and password");
         }
 
         const email = credentials.email.toLowerCase();
         const ip = ipFromAuthorizeReq(req);
         if ((await limitSignIn(email, ip)).limited) {
-          throw new Error(TOO_MANY_ATTEMPTS_NL);
+          throw new Error(TOO_MANY_ATTEMPTS_MESSAGE);
         }
 
         const user = await prisma.user.findUnique({
@@ -45,13 +45,13 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.passwordHash) {
-          throw new Error("Geen account gevonden met dit e-mailadres");
+          throw new Error("No account found with this email address");
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
 
         if (!isValid) {
-          throw new Error("Ongeldig wachtwoord");
+          throw new Error("Invalid password");
         }
 
         return {

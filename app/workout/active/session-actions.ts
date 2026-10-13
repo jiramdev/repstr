@@ -16,7 +16,7 @@ import {
 
 async function requireUserId() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
   return session.user.id;
 }
 

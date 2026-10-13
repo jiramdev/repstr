@@ -22,7 +22,7 @@ export async function saveOnboarding(input: {
   weight: string;
 }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
 
   const parsed = z
     .object({
@@ -37,22 +37,22 @@ export async function saveOnboarding(input: {
       sex: input?.sex ?? "",
       weight: input?.weight ?? "",
     });
-  if (!parsed.success) return { error: "Controleer de velden." };
+  if (!parsed.success) return { error: "Check the fields." };
   const { age: ageRaw, heightCm: heightRaw, sex: sexRaw, weight: weightRaw } = parsed.data;
 
   const age = parseOptionalNumber(ageRaw);
   if (ageRaw.trim() && (age === null || age < 10 || age > 100)) {
-    return { error: "Leeftijd moet tussen 10 en 100 liggen." };
+    return { error: "Age must be between 10 and 100." };
   }
 
   const heightCm = parseOptionalNumber(heightRaw);
   if (heightRaw.trim() && (heightCm === null || heightCm < 80 || heightCm > 250)) {
-    return { error: "Lengte moet tussen 80 en 250 cm liggen." };
+    return { error: "Height must be between 80 and 250 cm." };
   }
 
   const weight = parseOptionalNumber(weightRaw);
   if (weightRaw.trim() && (weight === null || weight <= 0 || weight > 400)) {
-    return { error: "Voer een geldig gewicht in." };
+    return { error: "Enter a valid weight." };
   }
 
   const sex = sexRaw === "man" || sexRaw === "vrouw" || sexRaw === "anders" ? sexRaw : null;

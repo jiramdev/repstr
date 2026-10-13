@@ -84,6 +84,8 @@ export const viewport: Viewport = {
   colorScheme: "light",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -92,7 +94,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="nl" style={{ backgroundColor: "#baa3d0", colorScheme: "light" }}>
+    <html lang="en" style={{ backgroundColor: "#baa3d0", colorScheme: "light" }}>
       <body
         className={`${inter.variable} ${anton.variable} font-sans antialiased min-h-screen selection:bg-[#141416] selection:text-[#baa3d0]`}
         style={{ backgroundColor: "#baa3d0", colorScheme: "light" }}

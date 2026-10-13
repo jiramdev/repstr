@@ -30,14 +30,14 @@ function parseOptionalNumber(value: string) {
 
 export async function updateAccount(input: AccountInput, currentPassword = "") {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
 
   const parsed = z
     .object({ name: nameSchema, email: emailSchema })
     .safeParse({ name: input?.name?.trim(), email: input?.email?.trim() });
   if (!parsed.success) {
     const issue = parsed.error.issues[0]?.path[0];
-    return { error: issue === "email" ? "Vul een geldig e-mailadres in." : "Vul een gebruikersnaam in." };
+    return { error: issue === "email" ? "Enter a valid email address." : "Enter a username." };
   }
   const name = parsed.data.name;
   const email = parsed.data.email;
@@ -57,23 +57,23 @@ export async function updateAccount(input: AccountInput, currentPassword = "") {
       weight: input?.weight ?? "",
       currentPassword,
     });
-  if (!strings.success) return { error: "Controleer de velden." };
+  if (!strings.success) return { error: "Check the fields." };
   const { age: ageRaw, heightCm: heightRaw, sex: sexRaw, weight: weightRaw } = strings.data;
   const currentPasswordSafe = strings.data.currentPassword;
 
   const age = parseOptionalNumber(ageRaw);
   if (ageRaw.trim() && (age === null || age < 10 || age > 100)) {
-    return { error: "Leeftijd moet tussen 10 en 100 liggen." };
+    return { error: "Age must be between 10 and 100." };
   }
 
   const heightCm = parseOptionalNumber(heightRaw);
   if (heightRaw.trim() && (heightCm === null || heightCm < 80 || heightCm > 250)) {
-    return { error: "Lengte moet tussen 80 en 250 cm liggen." };
+    return { error: "Height must be between 80 and 250 cm." };
   }
 
   const weight = parseOptionalNumber(weightRaw);
   if (weightRaw.trim() && (weight === null || weight <= 0 || weight > 400)) {
-    return { error: "Voer een geldig gewicht in." };
+    return { error: "Enter a valid weight." };
   }
 
   const sex = sexRaw === "man" || sexRaw === "vrouw" || sexRaw === "anders" ? sexRaw : null;
@@ -82,15 +82,15 @@ export async function updateAccount(input: AccountInput, currentPassword = "") {
     where: { id: session.user.id },
     select: { email: true, passwordHash: true },
   });
-  if (!currentUser) return { error: "Account niet gevonden." };
+  if (!currentUser) return { error: "Account not found." };
 
   const emailChanged = email !== currentUser.email;
   if (emailChanged) {
     if (!currentPasswordSafe) {
-      return { error: "Vul je huidige wachtwoord in om je e-mail te wijzigen." };
+      return { error: "Enter your current password to change your email." };
     }
     const matches = await bcrypt.compare(currentPasswordSafe, currentUser.passwordHash);
-    if (!matches) return { error: "Huidig wachtwoord klopt niet." };
+    if (!matches) return { error: "Current password is incorrect." };
   }
 
   const existing = await prisma.user.findUnique({
@@ -98,7 +98,7 @@ export async function updateAccount(input: AccountInput, currentPassword = "") {
     select: { id: true },
   });
   if (existing && existing.id !== session.user.id) {
-    return { error: "Dit e-mailadres is al in gebruik." };
+    return { error: "This email address is already in use." };
   }
 
   try {
@@ -115,7 +115,7 @@ export async function updateAccount(input: AccountInput, currentPassword = "") {
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return { error: "Dit e-mailadres is al in gebruik." };
+      return { error: "This email address is already in use." };
     }
     throw error;
   }
@@ -140,25 +140,25 @@ export async function updateAccount(input: AccountInput, currentPassword = "") {
 
 export async function updatePassword(currentPassword: string, nextPassword: string) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Niet ingelogd");
+  if (!session?.user?.id) throw new Error("Not signed in");
 
   const parsed = z
     .object({ current: z.string().min(1).max(128), next: passwordSchema })
     .safeParse({ current: currentPassword, next: nextPassword });
   if (!parsed.success) {
-    return { error: "Vul je huidige en nieuwe wachtwoord in." };
+    return { error: "Enter your current and new password." };
   }
-  const tooShort = passwordRuleError(parsed.data.next, "Het nieuwe wachtwoord");
+  const tooShort = passwordRuleError(parsed.data.next, "The new password");
   if (tooShort) return { error: tooShort };
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { passwordHash: true },
   });
-  if (!user) return { error: "Account niet gevonden." };
+  if (!user) return { error: "Account not found." };
 
   const matches = await bcrypt.compare(parsed.data.current, user.passwordHash);
-  if (!matches) return { error: "Huidig wachtwoord klopt niet." };
+  if (!matches) return { error: "Current password is incorrect." };
 
   const passwordHash = await bcrypt.hash(parsed.data.next, 12);
   await prisma.user.update({
