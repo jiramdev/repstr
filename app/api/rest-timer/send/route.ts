@@ -52,11 +52,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const { exerciseName, planId, userId, token } = payload as {
+  const { exerciseName, planId, userId, token, workoutLogId } = payload as {
     exerciseName?: unknown;
     planId?: unknown;
     userId?: unknown;
     token?: unknown;
+    workoutLogId?: unknown;
   };
 
   if (typeof userId !== "string" || !userId || typeof token !== "string" || !token) {
@@ -67,15 +68,30 @@ export async function POST(req: Request) {
     const timer = await prisma.restTimer.findUnique({
       where: { userId_token: { userId, token } },
     });
+    const fireDelaySec =
+      timer?.fireAt != null ? Math.round((Date.now() - timer.fireAt.getTime()) / 1000) : null;
     if (!timer || timer.status !== REST_STATUS.PENDING) {
+      console.error("Rest timer skipped", {
+        userId,
+        token,
+        status: timer?.status ?? "missing",
+        fireDelaySec,
+      });
       return NextResponse.json({ skipped: true });
     }
+
+    const sessionId =
+      typeof workoutLogId === "string" && workoutLogId
+        ? workoutLogId
+        : timer.workoutLogId;
+    const tag = `rest-${token}`;
+    const topic = `rest-${sessionId ?? token}`;
 
     const subscriptions = await prisma.pushSubscription.findMany({
       where: { userId },
     });
     if (subscriptions.length === 0) {
-      console.error("No push subscriptions for rest timer", { userId, token });
+      console.error("No push subscriptions for rest timer", { userId, token, fireDelaySec });
       await prisma.restTimer.update({
         where: { id: timer.id },
         data: { status: REST_STATUS.CANCELLED },
@@ -104,11 +120,12 @@ export async function POST(req: Request) {
       title: "Rest over ⚡️",
       body: `Time for your next set of ${name}!`,
       url: redirectPath,
-      tag: "rest-over",
+      tag,
+      renotify: true,
     });
 
     let sent = 0;
-    let failed = 0;
+    const failedStatuses: (number | null)[] = [];
     for (const subscription of subscriptions) {
       try {
         await webpush.sendNotification(
@@ -117,15 +134,21 @@ export async function POST(req: Request) {
             keys: { p256dh: subscription.p256dh, auth: subscription.auth },
           },
           pushBody,
-          { urgency: "high", TTL: 60 }
+          { urgency: "high", TTL: 300, topic }
         );
         sent += 1;
       } catch (error) {
         const status = statusCode(error);
         if (status === 404 || status === 410) {
+          console.error("Removing dead push subscription", {
+            userId,
+            token,
+            subscriptionId: subscription.id,
+            status,
+          });
           await prisma.pushSubscription.delete({ where: { endpoint: subscription.endpoint } }).catch(() => {});
         } else {
-          failed += 1;
+          failedStatuses.push(status ?? null);
           console.error("Failed to send push", {
             userId,
             token,
@@ -142,7 +165,19 @@ export async function POST(req: Request) {
       console.error("Failed to save rest timer status", { userId, token, status, error });
     });
 
-    if (sent === 0 && failed > 0) {
+    if (status === REST_STATUS.SENT) {
+      console.error("Rest timer sent", { userId, token, sent, fireDelaySec });
+    } else {
+      console.error("Rest timer failed", {
+        userId,
+        token,
+        sent,
+        failedStatuses,
+        fireDelaySec,
+      });
+    }
+
+    if (sent === 0 && failedStatuses.length > 0) {
       return NextResponse.json({ error: "Push failed" }, { status: 500 });
     }
 

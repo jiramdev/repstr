@@ -342,8 +342,10 @@ export default function ActiveWorkoutLogger({
   const targetKey = draftKey(userId, "rest_target");
   const tokenKey = draftKey(userId, "rest_token");
   const exerciseKey = draftKey(userId, "rest_exercise");
-  const pushGen = useRef(0);
   const draining = useRef<Promise<void> | null>(null);
+  // Push subscription resolved once per mount and kept in memory, so every
+  // set tick can schedule its push immediately without another async dance.
+  const pushSubscription = useRef<PushSubscription | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(initialSession?.id ?? null);
   const [starting, setStarting] = useState(!initialSession);
   const [isFinishing, setFinishing] = useState(false);
@@ -413,6 +415,30 @@ export default function ActiveWorkoutLogger({
     navigator.serviceWorker.register("/sw.js").catch((err) => {
       console.error("Failed to register service worker:", err);
     });
+    // Resolve the push subscription once and keep it in memory for the
+    // whole workout, so scheduling never waits on the service worker again.
+    let cancelled = false;
+    navigator.serviceWorker.ready
+      .then(async (reg) => {
+        try {
+          let sub = await reg.pushManager.getSubscription();
+          if (!sub) {
+            const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+            if (!vapidPublicKey) return;
+            sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+            });
+          }
+          if (!cancelled && sub) pushSubscription.current = sub;
+        } catch (err) {
+          console.error("Failed to resolve push subscription:", err);
+        }
+      })
+      .catch((err) => console.error("Failed to resolve push subscription:", err));
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const goStep = useCallback(
@@ -543,7 +569,6 @@ export default function ActiveWorkoutLogger({
   }, []);
 
   const dismissRestNotification = useCallback(() => {
-    pushGen.current += 1;
     const token = localStorage.getItem(tokenKey);
     writeDraft(tokenKey, null);
     if (token) cancelRestNotification(token);
@@ -553,38 +578,28 @@ export default function ActiveWorkoutLogger({
     (seconds: number, exerciseName: string) => {
       if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
       if (!sessionId || !restPushEnabled) return;
+      const sub = pushSubscription.current;
+      if (!sub) return;
 
-      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!vapidPublicKey) return;
-
-      const gen = ++pushGen.current;
+      // The server atomically replaces this session's older pending timer,
+      // so no generation counter or self-cancel is needed here.
       const token = crypto.randomUUID();
       const activeSession = sessionId;
-
-      navigator.serviceWorker.ready
-        .then(async (reg) => {
-          let sub = await reg.pushManager.getSubscription();
-          if (!sub) {
-            sub = await reg.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-            });
-          }
-          if (!sub || pushGen.current !== gen) return;
-
-          const response = await fetch("/api/rest-timer", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              subscription: sub,
-              delaySeconds: seconds,
-              exerciseName,
-              planId,
-              token,
-              workoutLogId: activeSession,
-            }),
-          });
-          if (!response.ok || pushGen.current !== gen) {
+      fetch("/api/rest-timer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subscription: sub.toJSON(),
+          delaySeconds: seconds,
+          exerciseName,
+          planId,
+          token,
+          workoutLogId: activeSession,
+        }),
+        keepalive: true,
+      })
+        .then(async (response) => {
+          if (!response.ok) {
             cancelRestNotification(token);
             return;
           }

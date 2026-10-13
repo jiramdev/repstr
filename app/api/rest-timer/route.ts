@@ -6,6 +6,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { REST_STATUS } from "@/lib/notifications";
+import { upsertPushSubscription } from "@/lib/push";
 import { delaySecondsSchema, planIdSchema, tokenSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -64,37 +65,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "APP_URL missing" }, { status: 500 });
     }
 
-    // Never move an endpoint to another user: same user updates keys,
-    // a different user deletes the old row and creates a new one.
-    const existing = await prisma.pushSubscription.findUnique({
-      where: { endpoint: subscription.endpoint },
-      select: { id: true, userId: true },
+    await upsertPushSubscription(userId, {
+      endpoint: subscription.endpoint,
+      p256dh: subscription.keys.p256dh,
+      auth: subscription.keys.auth,
     });
-    if (!existing) {
-      await prisma.pushSubscription.create({
-        data: {
-          userId,
-          endpoint: subscription.endpoint,
-          p256dh: subscription.keys.p256dh,
-          auth: subscription.keys.auth,
-        },
-      });
-    } else if (existing.userId === userId) {
-      await prisma.pushSubscription.update({
-        where: { id: existing.id },
-        data: { p256dh: subscription.keys.p256dh, auth: subscription.keys.auth },
-      });
-    } else {
-      await prisma.pushSubscription.delete({ where: { id: existing.id } });
-      await prisma.pushSubscription.create({
-        data: {
-          userId,
-          endpoint: subscription.endpoint,
-          p256dh: subscription.keys.p256dh,
-          auth: subscription.keys.auth,
-        },
-      });
-    }
 
     // Link the timer to the user's own in-progress session when provided.
     let sessionId: string | null = null;
@@ -106,11 +81,31 @@ export async function POST(req: Request) {
       sessionId = owned?.id ?? null;
     }
 
-    await prisma.restTimer.upsert({
-      where: { userId_token: { userId, token } },
-      create: { userId, token, status: REST_STATUS.PENDING, workoutLogId: sessionId },
-      update: { status: REST_STATUS.PENDING, workoutLogId: sessionId, qstashMessageId: null },
-    });
+    const fireAt = new Date(Date.now() + delaySeconds * 1000);
+
+    // Replace the session's other pending timers atomically with the new one,
+    // in the same transaction. Stale QStash callbacks find a non-pending row
+    // and skip. (logSet never cancels timers; the race is gone.)
+    await prisma.$transaction([
+      ...(sessionId
+        ? [
+            prisma.restTimer.updateMany({
+              where: {
+                userId,
+                workoutLogId: sessionId,
+                status: REST_STATUS.PENDING,
+                NOT: { token },
+              },
+              data: { status: REST_STATUS.CANCELLED },
+            }),
+          ]
+        : []),
+      prisma.restTimer.upsert({
+        where: { userId_token: { userId, token } },
+        create: { userId, token, status: REST_STATUS.PENDING, workoutLogId: sessionId, fireAt },
+        update: { status: REST_STATUS.PENDING, workoutLogId: sessionId, qstashMessageId: null, fireAt },
+      }),
+    ]);
 
     const name = exerciseName.trim() ? exerciseName.trim() : "your exercise";
 
@@ -128,6 +123,7 @@ export async function POST(req: Request) {
           planId: planId ?? null,
           userId,
           token,
+          workoutLogId: sessionId,
         },
         delay: delaySeconds,
         headers: Object.keys(headers).length > 0 ? headers : undefined,

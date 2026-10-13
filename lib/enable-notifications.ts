@@ -68,3 +68,30 @@ export async function disableNotifications() {
   await subscription.unsubscribe();
   await removePushSubscription(endpoint);
 }
+
+/**
+ * Refresh or upsert the current device subscription. Runs on every app open
+ * while push permission is granted, so expired or rotated subscriptions heal.
+ */
+export async function refreshPushSubscription() {
+  if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) return;
+  if (Notification.permission !== "granted") return;
+
+  const registration = await navigator.serviceWorker.getRegistration();
+  if (!registration) return;
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!vapidPublicKey) return;
+    try {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
+    } catch {
+      return;
+    }
+  }
+  if (!subscription) return;
+  await storeSubscription(subscription);
+}

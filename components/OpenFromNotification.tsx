@@ -2,13 +2,14 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { syncExistingPushSubscription } from "@/lib/enable-notifications";
+import { refreshPushSubscription, syncExistingPushSubscription } from "@/lib/enable-notifications";
 
 export default function OpenFromNotification() {
   const router = useRouter();
 
   useEffect(() => {
     syncExistingPushSubscription().catch(() => {});
+    refreshPushSubscription().catch(() => {});
   }, []);
 
   useEffect(() => {

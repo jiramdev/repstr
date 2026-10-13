@@ -44,6 +44,7 @@ model RestTimer {
   workoutLogId    String?
   workoutLog      WorkoutLog? @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
   qstashMessageId String?
+  fireAt          DateTime?
   createdAt       DateTime    @default(now())
 
   @@unique([userId, token])

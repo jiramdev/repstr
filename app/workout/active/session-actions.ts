@@ -99,10 +99,14 @@ export async function logSet(sessionId: string, set: unknown) {
     select: { id: true },
   });
 
-  await cancelSessionTimers(userId, session.id);
+  // NOTE: logSet never cancels timers. The rest timer for the NEXT set is
+  // scheduled by POST /api/rest-timer, which atomically replaces the
+  // session's other pending timers. Cancelling here raced that POST.
   refreshUserCache(userId);
   return { success: true as const, entryId: entry.id };
 }
+
+/** Skip/next/finish/abandon cancel pending timers. logSet never cancels. */
 
 const updateSetSchema = completedSetSchema.omit({ exerciseId: true, exerciseName: true, setNumber: true });
 
