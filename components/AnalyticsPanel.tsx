@@ -69,7 +69,7 @@ export default function AnalyticsPanel({
     }));
 
   return (
-    <div className="min-h-screen bg-[#baa3d0] text-white pb-32 pt-4 px-4 select-none">
+    <div className="min-h-screen bg-[#baa3d0] text-white pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 px-4 select-none">
       <main className="max-w-sm mx-auto space-y-3.5">
         <header className="flex items-center px-1 py-1">
           <div className="h-10 bg-[#141416] border border-white/[0.08] px-4 rounded-full flex items-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.15)]">

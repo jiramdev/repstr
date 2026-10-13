@@ -1,6 +1,6 @@
 export default function PlanLoading() {
   return (
-    <div className="min-h-screen bg-[#baa3d0] text-white pb-32 pt-4 px-4 select-none" aria-busy="true">
+    <div className="min-h-screen bg-[#baa3d0] text-white pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 px-4 select-none" aria-busy="true">
       <main className="max-w-sm mx-auto space-y-3.5">
         <div className="h-10 w-40 bg-[#141416] rounded-full animate-pulse" />
         <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-2 animate-pulse">

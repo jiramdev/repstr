@@ -25,7 +25,7 @@ export default async function AccountPage() {
   if (!accountUser) redirect("/login");
 
   return (
-    <div className="min-h-screen bg-[#baa3d0] text-white pb-32 pt-4 px-4 select-none">
+    <div className="min-h-screen bg-[#baa3d0] text-white pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 px-4 select-none">
       <main className="max-w-sm mx-auto space-y-3.5">
         <TabHeader title="Account" />
         <AccountForm

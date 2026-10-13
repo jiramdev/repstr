@@ -60,6 +60,28 @@ describe("exerciseBests", () => {
     ]);
     expect(bests.find((row) => row.name === "Squat")?.topWeight).toBe(100);
   });
+
+  it("ignores null and zero weights so 60 kg x 8 gives a 60 kg PR", () => {
+    const bests = exerciseBests([
+      workout("2026-10-12T18:00:00Z", [
+        { exerciseName: "Bench", weight: 0, reps: 8, durationSeconds: null, tracking: "weight" },
+        { exerciseName: "Bench", weight: null, reps: 8, durationSeconds: null, tracking: "weight" },
+      ]),
+      workout("2026-10-14T18:00:00Z", [
+        { exerciseName: "Bench", weight: 60, reps: 8, durationSeconds: null, tracking: "weight" },
+      ]),
+    ]);
+    expect(bests.find((row) => row.name === "Bench")?.topWeight).toBe(60);
+  });
+
+  it("creates no PR row for entries that contribute nothing", () => {
+    const bests = exerciseBests([
+      workout("2026-10-12T18:00:00Z", [
+        { exerciseName: "Ghost", weight: 0, reps: 0, durationSeconds: null, tracking: "weight" },
+      ]),
+    ]);
+    expect(bests.find((row) => row.name === "Ghost")).toBeUndefined();
+  });
 });
 
 describe("placeholderSet", () => {

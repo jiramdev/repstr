@@ -74,7 +74,8 @@ export function exerciseSeries(workouts: StrengthWorkout[]): Record<string, { tr
   return series;
 }
 
-/** Best per exercise: top weight, best reps, best hold. */
+/** Best per exercise: top weight, best reps, best hold. Entries that
+    contribute nothing (null/zero) never produce a phantom "0 kg" row. */
 export function exerciseBests(workouts: StrengthWorkout[]) {
   const bests = new Map<
     string,
@@ -83,16 +84,25 @@ export function exerciseBests(workouts: StrengthWorkout[]) {
   for (const workout of workouts) {
     for (const entry of workout.entries) {
       const name = entry.exerciseName.trim() || "Exercise";
-      const row = bests.get(name) ?? { tracking: entry.tracking, topWeight: 0, bestReps: 0, bestHold: 0 };
-      row.tracking = entry.tracking;
-      if (entry.tracking === "weight" && entry.weight != null) {
+      if (entry.tracking === "weight") {
+        if (entry.weight == null || entry.weight <= 0) continue;
+        const row = bests.get(name) ?? { tracking: entry.tracking, topWeight: 0, bestReps: 0, bestHold: 0 };
+        row.tracking = entry.tracking;
         row.topWeight = Math.max(row.topWeight, entry.weight);
+        bests.set(name, row);
       } else if (entry.tracking === "reps") {
+        if (entry.reps <= 0) continue;
+        const row = bests.get(name) ?? { tracking: entry.tracking, topWeight: 0, bestReps: 0, bestHold: 0 };
+        row.tracking = entry.tracking;
         row.bestReps = Math.max(row.bestReps, entry.reps);
-      } else if (entry.tracking === "hold" && entry.durationSeconds != null) {
+        bests.set(name, row);
+      } else if (entry.tracking === "hold") {
+        if (entry.durationSeconds == null || entry.durationSeconds <= 0) continue;
+        const row = bests.get(name) ?? { tracking: entry.tracking, topWeight: 0, bestReps: 0, bestHold: 0 };
+        row.tracking = entry.tracking;
         row.bestHold = Math.max(row.bestHold, entry.durationSeconds);
+        bests.set(name, row);
       }
-      bests.set(name, row);
     }
   }
   return [...bests.entries()]

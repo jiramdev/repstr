@@ -54,6 +54,22 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
     page.getByText("Bodyweight · 2 sets · target 15 reps · rest 5s")
   ).toBeVisible();
 
+  // 3b. The edit screen for an existing exercise uses the clear layout.
+  await page.getByRole("button", { name: "Edit E2E Push-up" }).click();
+  await expect(page.getByLabel("Target (reps)", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+  await expect(page.getByText("Archive exercise")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  // 3c. A weight exercise for the 60 kg PR check.
+  await page.getByRole("button", { name: "Add exercise" }).click();
+  await page.getByPlaceholder("E.g. Squat").fill("E2E Bench");
+  await page.getByRole("button", { name: "Weight", exact: true }).click();
+  await page.getByLabel("Default sets", { exact: true }).fill("1");
+  await page.getByLabel("Rest", { exact: true }).fill("5");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("E2E Bench")).toBeVisible();
+
   // 4. Schedule: create a plan and assign it to Monday.
   await page.goto("/schedule");
   await page.getByRole("button", { name: "New plan" }).click();
@@ -78,10 +94,16 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   await page.getByRole("button", { name: /E2E Push-up/ }).first().click();
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByText("E2E Push-up")).toHaveCount(2);
+  // Third placement: the weight exercise.
+  await openAddForm(page);
+  await page.getByPlaceholder("Search or create an exercise").fill("E2E Bench");
+  await page.getByRole("button", { name: /E2E Bench/ }).first().click();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByText("E2E Bench")).toBeVisible();
 
   // 6. Workout, one exercise at a time.
   await page.goto(`/workout/active?planId=${planId}`);
-  await expect(page.getByText("Exercise 1 of 2")).toBeVisible();
+  await expect(page.getByText("Exercise 1 of 3")).toBeVisible();
   await expect(page.getByText("Set 1 of 2")).toBeVisible();
   // Bodyweight: no weight field, reps only.
   await expect(page.getByLabel(/weight in kilos/)).toHaveCount(0);
@@ -96,19 +118,26 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   await page.getByRole("button", { name: "Skip rest" }).click();
   // Next exercise.
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByText("Exercise 2 of 2")).toBeVisible();
+  await expect(page.getByText("Exercise 2 of 3")).toBeVisible();
   await page.getByLabel("Set 1 reps").fill("8");
   await page.getByRole("button", { name: "Check off set 1" }).click();
   await page.getByRole("button", { name: "Skip rest" }).click();
   await page.getByLabel("Set 2 reps").fill("9");
   await page.getByRole("button", { name: "Check off set 2" }).click();
   await page.getByRole("button", { name: "Skip rest" }).click();
+  // Third exercise: 60 kg x 8 on the bar.
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByText("Exercise 3 of 3")).toBeVisible();
+  await page.getByLabel("Set 1 weight in kilos").fill("60");
+  await page.getByLabel("Set 1 reps").fill("8");
+  await page.getByRole("button", { name: "Check off set 1" }).click();
+  await page.getByRole("button", { name: "Skip rest" }).click();
   await page.getByRole("button", { name: "FINISH WORKOUT" }).click();
   await expect(page).toHaveURL("/");
 
   // 7. Second workout: placeholders from last time + "same as last time".
   await page.goto(`/workout/active?planId=${planId}`);
-  await expect(page.getByText("Exercise 1 of 2")).toBeVisible();
+  await expect(page.getByText("Exercise 1 of 3")).toBeVisible();
   // Both placements share one exercise history; set 1 was logged as 10 and 8.
   expect(await page.getByLabel("Set 1 reps").getAttribute("placeholder")).toMatch(/^(8|10)$/);
   await expect(
@@ -124,4 +153,7 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   await expect(page.getByText("E2E Push-up").first()).toBeVisible();
   await expect(page.getByText("E2E Plan").first()).toBeVisible();
   await expect(page.getByText("History")).toBeVisible();
+  // Logging 60 kg gives a PR of 60 kg.
+  await expect(page.getByText("E2E Bench").first()).toBeVisible();
+  await expect(page.getByText("60", { exact: true }).first()).toBeVisible();
 });

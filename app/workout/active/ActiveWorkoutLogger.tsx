@@ -309,19 +309,21 @@ function setPayload(
   previous?: PreviousSet
 ): { exerciseId?: string; exerciseName: string; setNumber: number; weight: number | null; reps: number; durationSeconds: number | null } {
   const mode = exercise.tracking ?? "weight";
-  const num = (raw: string, fallback: number | null | undefined, integer: boolean) => {
-    if (raw.trim() === "") return fallback ?? 0;
+  const numOrNull = (raw: string, fallback: number | null | undefined, integer: boolean) => {
+    if (raw.trim() === "") return fallback ?? null;
     const parsed = integer ? parseInt(raw, 10) : Number(raw);
-    return Number.isFinite(parsed) ? parsed : fallback ?? 0;
+    if (!Number.isFinite(parsed)) return fallback ?? null;
+    return parsed;
   };
   return {
     ...(exercise.exerciseId ? { exerciseId: exercise.exerciseId } : {}),
     exerciseName: exercise.name,
     setNumber: row.setNumber,
-    weight: mode === "weight" ? num(row.weight, previous?.weight, false) : null,
-    reps: mode === "hold" ? 0 : num(row.reps, previous?.reps, true),
+    // Empty stays empty (null): never store a phantom 0 that would show as "0 kg".
+    weight: mode === "weight" ? numOrNull(row.weight, previous?.weight, false) : null,
+    reps: mode === "hold" ? 0 : (numOrNull(row.reps, previous?.reps, true) ?? 0),
     durationSeconds:
-      mode === "hold" ? num(row.duration, previous?.durationSeconds, true) : null,
+      mode === "hold" ? numOrNull(row.duration, previous?.durationSeconds, true) : null,
   };
 }
 
@@ -339,7 +341,7 @@ export default function ActiveWorkoutLogger({
   const tokenKey = draftKey(userId, "rest_token");
   const exerciseKey = draftKey(userId, "rest_exercise");
   const pushGen = useRef(0);
-  const draining = useRef(false);
+  const draining = useRef<Promise<void> | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(initialSession?.id ?? null);
   const [starting, setStarting] = useState(!initialSession);
   const [isFinishing, setFinishing] = useState(false);
@@ -436,13 +438,30 @@ export default function ActiveWorkoutLogger({
 
   const drainOutbox = useCallback(
     async (activeSessionId: string) => {
-      if (draining.current) return;
-      draining.current = true;
-      try {
-        const ops = (await listOps())
-          .filter((op) => op.sessionId === activeSessionId)
-          .sort((a, b) => a.createdAt - b.createdAt);
-        for (const op of ops) {
+      // Mutex with waiting (never skip): concurrent callers wait for the
+      // in-flight pass, then re-read the queue. Ops can never strand.
+      while (true) {
+        const inFlight = draining.current;
+        if (inFlight) {
+          try {
+            await inFlight;
+          } catch {
+            // The pass below re-reads the queue either way.
+          }
+          continue;
+        }
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        draining.current = gate;
+        try {
+          const ops = (await listOps())
+            .filter((op) => op.sessionId === activeSessionId)
+            .sort((a, b) => a.createdAt - b.createdAt);
+          if (ops.length === 0) return;
+          let failed = false;
+          for (const op of ops) {
           try {
             if (op.kind === "create") {
               const result = await logSet(activeSessionId, op.set);
@@ -489,11 +508,17 @@ export default function ActiveWorkoutLogger({
             }
           } catch {
             // Offline or transient: keep the op queued and retry later.
+            failed = true;
             break;
           }
+          }
+          // A failed pass stops here (retry on the next trigger) instead of
+          // spinning on a persistent error.
+          if (failed) return;
+        } finally {
+          draining.current = null;
+          release();
         }
-      } finally {
-        draining.current = false;
       }
     },
     []
@@ -707,6 +732,14 @@ export default function ActiveWorkoutLogger({
     setSaveError(null);
     try {
       await drainOutbox(sessionId);
+      // Never finish with unsynced sets: they would orphan under a finished
+      // session id that later drains ignore.
+      const pending = (await listOps()).filter((op) => op.sessionId === sessionId);
+      if (pending.length > 0) {
+        setSaveError("You're offline. Reconnect to finish syncing your sets.");
+        setFinishing(false);
+        return;
+      }
       const result = await finishWorkoutSession(sessionId);
       if (!("success" in result)) {
         setSaveError(result.error ?? "Save failed.");
