@@ -17,12 +17,12 @@ export async function POST(req: Request) {
   const currentSigningKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
   const nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY;
   if (!currentSigningKey || !nextSigningKey) {
-    return NextResponse.json({ error: "QStash signing keys ontbreken" }, { status: 500 });
+    return NextResponse.json({ error: "QStash signing keys missing" }, { status: 500 });
   }
 
   const signature = req.headers.get("upstash-signature");
   if (!signature) {
-    return NextResponse.json({ error: "Niet toegestaan" }, { status: 401 });
+    return NextResponse.json({ error: "Not allowed" }, { status: 401 });
   }
 
   const bodyText = await req.text();
@@ -34,22 +34,22 @@ export async function POST(req: Request) {
     });
     const valid = await receiver.verify({ signature, body: bodyText });
     if (!valid) {
-      return NextResponse.json({ error: "Niet toegestaan" }, { status: 401 });
+      return NextResponse.json({ error: "Not allowed" }, { status: 401 });
     }
   } catch (error) {
-    console.error("QStash handtekening ongeldig:", error);
-    return NextResponse.json({ error: "Niet toegestaan" }, { status: 401 });
+    console.error("Invalid QStash signature:", error);
+    return NextResponse.json({ error: "Not allowed" }, { status: 401 });
   }
 
   let payload: unknown;
   try {
     payload = JSON.parse(bodyText);
   } catch {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
   if (!payload || typeof payload !== "object") {
-    return NextResponse.json({ error: "Ongeldige body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
   const { exerciseName, planId, userId, token } = payload as {
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
   };
 
   if (typeof userId !== "string" || !userId || typeof token !== "string" || !token) {
-    return NextResponse.json({ error: "Ongeldige timer" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid timer" }, { status: 400 });
   }
 
   try {
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       where: { userId },
     });
     if (subscriptions.length === 0) {
-      console.error("Geen push-subscriptions voor rusttimer", { userId, token });
+      console.error("No push subscriptions for rest timer", { userId, token });
       await prisma.restTimer.update({
         where: { id: timer.id },
         data: { status: REST_STATUS.CANCELLED },
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
     const privateKey = process.env.VAPID_PRIVATE_KEY;
     const subject = process.env.VAPID_SUBJECT;
     if (!publicKey || !privateKey || !subject) {
-      return NextResponse.json({ error: "VAPID niet ingesteld" }, { status: 500 });
+      return NextResponse.json({ error: "VAPID not configured" }, { status: 500 });
     }
 
     webpush.setVapidDetails(subject, publicKey, privateKey);
@@ -95,14 +95,14 @@ export async function POST(req: Request) {
     const name =
       typeof exerciseName === "string" && exerciseName.trim()
         ? exerciseName.trim().slice(0, 80)
-        : "je oefening";
+        : "your exercise";
     const redirectPath =
       typeof planId === "string" && planId
         ? `/workout/active?planId=${encodeURIComponent(planId)}`
         : "/workout/active";
     const pushBody = JSON.stringify({
-      title: "Rust voorbij ⚡️",
-      body: `Tijd voor je volgende set van ${name}!`,
+      title: "Rest over ⚡️",
+      body: `Time for your next set of ${name}!`,
       url: redirectPath,
       tag: "rest-over",
     });
@@ -126,7 +126,7 @@ export async function POST(req: Request) {
           await prisma.pushSubscription.delete({ where: { endpoint: subscription.endpoint } }).catch(() => {});
         } else {
           failed += 1;
-          console.error("Fout bij verzenden push", {
+          console.error("Failed to send push", {
             userId,
             token,
             subscriptionId: subscription.id,
@@ -139,16 +139,16 @@ export async function POST(req: Request) {
     // Mark sent only if at least one push succeeded, otherwise failed.
     const status = resolveRestStatus(sent);
     await prisma.restTimer.update({ where: { id: timer.id }, data: { status } }).catch((error) => {
-      console.error("Rusttimer-status opslaan mislukt", { userId, token, status, error });
+      console.error("Failed to save rest timer status", { userId, token, status, error });
     });
 
     if (sent === 0 && failed > 0) {
-      return NextResponse.json({ error: "Push mislukt" }, { status: 500 });
+      return NextResponse.json({ error: "Push failed" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, sent });
   } catch (error) {
-    console.error("Fout bij verzenden push:", error);
-    return NextResponse.json({ error: "Push mislukt" }, { status: 500 });
+    console.error("Failed to send push:", error);
+    return NextResponse.json({ error: "Push failed" }, { status: 500 });
   }
 }

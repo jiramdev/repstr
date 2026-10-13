@@ -67,7 +67,7 @@ export function amsterdamStartOfMonth(date = new Date()) {
 }
 
 export function formatAmsterdamDate(value: string | Date) {
-  return new Intl.DateTimeFormat("nl-NL", {
+  return new Intl.DateTimeFormat("en-GB", {
     timeZone: TIME_ZONE,
     day: "numeric",
     month: "short",

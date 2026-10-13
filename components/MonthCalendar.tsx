@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-const WEEKDAYS = ["MA", "DI", "WO", "DO", "VR", "ZA", "ZO"];
+const WEEKDAYS = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -25,7 +25,7 @@ export default function MonthCalendar({
   const daysInMonth = new Date(Date.UTC(cursor.year, cursor.month, 0)).getUTCDate();
   const atCurrentMonth = cursor.year === todayYear && cursor.month === todayMonth;
 
-  const label = new Date(Date.UTC(cursor.year, cursor.month - 1, 1)).toLocaleDateString("nl-NL", {
+  const label = new Date(Date.UTC(cursor.year, cursor.month - 1, 1)).toLocaleDateString("en-GB", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -49,7 +49,7 @@ export default function MonthCalendar({
       <div className="flex items-center justify-between px-1">
         <button
           type="button"
-          aria-label="Vorige maand"
+          aria-label="Previous month"
           onClick={() => shift(-1)}
           className="w-8 h-8 rounded-full flex items-center justify-center text-[#baa3d0] active:bg-white/10"
         >
@@ -60,12 +60,12 @@ export default function MonthCalendar({
             {label}
           </p>
           <p className="mt-1.5 text-[11px] text-[#a1a1aa]">
-            {sessions === 1 ? "1 training" : `${sessions} trainingen`}
+            {sessions === 1 ? "1 workout" : `${sessions} workouts`}
           </p>
         </div>
         <button
           type="button"
-          aria-label="Volgende maand"
+          aria-label="Next month"
           onClick={() => shift(1)}
           disabled={atCurrentMonth}
           className="w-8 h-8 rounded-full flex items-center justify-center text-[#baa3d0] active:bg-white/10 disabled:opacity-30"

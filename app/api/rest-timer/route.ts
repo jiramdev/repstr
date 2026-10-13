@@ -45,23 +45,23 @@ export async function POST(req: Request) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Ongeldige aanvraag" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const parsed = postSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Ongeldige aanvraag" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const { subscription, delaySeconds, exerciseName, planId, token, workoutLogId } = parsed.data;
 
     const qstashToken = process.env.QSTASH_TOKEN;
     const origin = appOrigin();
     if (!qstashToken) {
-      console.error("QSTASH_TOKEN ontbreekt");
-      return NextResponse.json({ error: "QStash token ontbreekt" }, { status: 500 });
+      console.error("QSTASH_TOKEN missing");
+      return NextResponse.json({ error: "QStash token missing" }, { status: 500 });
     }
     if (!origin) {
-      console.error("APP_URL ontbreekt");
-      return NextResponse.json({ error: "APP_URL ontbreekt" }, { status: 500 });
+      console.error("APP_URL missing");
+      return NextResponse.json({ error: "APP_URL missing" }, { status: 500 });
     }
 
     // Never move an endpoint to another user: same user updates keys,
@@ -112,7 +112,7 @@ export async function POST(req: Request) {
       update: { status: REST_STATUS.PENDING, workoutLogId: sessionId, qstashMessageId: null },
     });
 
-    const name = exerciseName.trim() ? exerciseName.trim() : "je oefening";
+    const name = exerciseName.trim() ? exerciseName.trim() : "your exercise";
 
     let messageId: string | null = null;
     try {
@@ -141,7 +141,7 @@ export async function POST(req: Request) {
         where: { userId, token, status: REST_STATUS.PENDING },
         data: { status: REST_STATUS.FAILED },
       });
-      return NextResponse.json({ error: "Kon timer niet inplannen" }, { status: 500 });
+      return NextResponse.json({ error: "Couldn't schedule timer" }, { status: 500 });
     }
 
     await prisma.restTimer.updateMany({
@@ -151,8 +151,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Fout bij QStash delay request:", error);
-    return NextResponse.json({ error: "Kon timer niet inplannen" }, { status: 500 });
+    console.error("QStash delay request failed:", error);
+    return NextResponse.json({ error: "Couldn't schedule timer" }, { status: 500 });
   }
 }
 
@@ -169,11 +169,11 @@ export async function DELETE(req: Request) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Geen timer" }, { status: 400 });
+      return NextResponse.json({ error: "No timer" }, { status: 400 });
     }
     const parsed = deleteSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Geen timer" }, { status: 400 });
+      return NextResponse.json({ error: "No timer" }, { status: 400 });
     }
 
     // Cancel only pending rows of the user's own session.
@@ -184,7 +184,7 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Fout bij annuleren rustmelding:", error);
-    return NextResponse.json({ error: "Kon melding niet annuleren" }, { status: 500 });
+    console.error("Failed to cancel rest notification:", error);
+    return NextResponse.json({ error: "Couldn't cancel notification" }, { status: 500 });
   }
 }

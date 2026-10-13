@@ -16,7 +16,7 @@ export interface NotificationItem {
 }
 
 function formatWhen(iso: string) {
-  return new Intl.DateTimeFormat("nl-NL", {
+  return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
     hour: "2-digit",
@@ -39,9 +39,9 @@ export default function NotificationList({ items }: { items: NotificationItem[] 
   if (items.length === 0) {
     return (
       <section className="bg-[#141416] border border-white/[0.08] rounded-[34px] px-6 py-12 text-center shadow-[0_16px_36px_rgba(0,0,0,0.25)]">
-        <p className="font-editorial text-[28px] text-white leading-none">Stil</p>
+        <p className="font-editorial text-[28px] text-white leading-none">Quiet</p>
         <p className="mt-3 text-[13px] text-[#a1a1aa]">
-          Nog geen meldingen. In de ochtend verschijnt hier de training van die dag.
+          No notifications yet. In the morning, today's workout shows up here.
         </p>
       </section>
     );

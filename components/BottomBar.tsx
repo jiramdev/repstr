@@ -74,7 +74,7 @@ function slidePages(page: HTMLElement, direction: 1 | -1, navigate: () => void) 
 
 const TABS = [
   { href: TAB_HREFS[0], icon: LayoutGrid, label: "Workouts" },
-  { href: TAB_HREFS[1], icon: Calendar, label: "Schema" },
+  { href: TAB_HREFS[1], icon: Calendar, label: "Schedule" },
   { href: TAB_HREFS[2], icon: BarChart3, label: "Stats" },
   { href: TAB_HREFS[3], icon: User, label: "Account" },
 ];

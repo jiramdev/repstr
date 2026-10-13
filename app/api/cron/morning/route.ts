@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   // Fail closed: reject when CRON_SECRET is missing or does not match.
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Niet toegestaan" }, { status: 401 });
+    return NextResponse.json({ error: "Not allowed" }, { status: 401 });
   }
 
   const { dayOfWeek, hour, dateKey } = amsterdamParts();
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   const subject = process.env.VAPID_SUBJECT;
   if (!publicKey || !privateKey || !subject) {
-    return NextResponse.json({ error: "VAPID niet ingesteld" }, { status: 500 });
+    return NextResponse.json({ error: "VAPID not configured" }, { status: 500 });
   }
 
   const days = await prisma.scheduleDay.findMany({
@@ -104,7 +104,7 @@ export async function GET(req: Request) {
       await prisma.appNotification.create({
         data: {
           userId,
-          title: "Vandaag",
+          title: "Today",
           body,
           href,
           dedupeKey,
@@ -112,7 +112,7 @@ export async function GET(req: Request) {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") continue;
-      console.error("Ochtendmelding opslaan mislukt:", error);
+      console.error("Failed to save morning notification:", error);
       continue;
     }
 
@@ -120,7 +120,7 @@ export async function GET(req: Request) {
     await prisma.user
       .update({ where: { id: userId }, data: { lastMorningSentDate: dateKey } })
       .catch((error) => {
-        console.error("Ochtendmelding datum opslaan mislukt", { userId, dateKey, error });
+        console.error("Failed to save morning notification date", { userId, dateKey, error });
       });
 
     for (const subscription of userDevices) {
@@ -130,7 +130,7 @@ export async function GET(req: Request) {
             endpoint: subscription.endpoint,
             keys: { p256dh: subscription.p256dh, auth: subscription.auth },
           },
-          JSON.stringify({ title: "Vandaag", body, url: href, tag: "morning" }),
+          JSON.stringify({ title: "Today", body, url: href, tag: "morning" }),
           { urgency: "high", TTL: 60 * 60 * 12 }
         );
         sent += 1;
@@ -139,7 +139,7 @@ export async function GET(req: Request) {
         if (status === 404 || status === 410) {
           await prisma.pushSubscription.delete({ where: { endpoint: subscription.endpoint } }).catch(() => {});
         } else {
-          console.error("Ochtendmelding versturen mislukt", { userId, status });
+          console.error("Failed to send morning notification", { userId, status });
         }
       }
     }

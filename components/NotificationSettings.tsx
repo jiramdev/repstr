@@ -60,16 +60,16 @@ export default function NotificationSettings() {
     <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] px-5 py-4 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="font-editorial text-[20px] tracking-wide text-white leading-none">Meldingen</p>
+          <p className="font-editorial text-[20px] tracking-wide text-white leading-none">Notifications</p>
           <p className="mt-2 text-[13px] text-[#a1a1aa]">
-            Elke ochtend een seintje als er een training gepland staat.
+            A nudge every morning when a workout is scheduled.
           </p>
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={on}
-          aria-label="Meldingen"
+          aria-label="Notifications"
           disabled={!ready || busy || unsupported}
           onClick={toggle}
           className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-40 ${
@@ -84,10 +84,10 @@ export default function NotificationSettings() {
         </button>
       </div>
       {unsupported && (
-        <p className="mt-3 text-[13px] text-[#a1a1aa]">Deze browser ondersteunt geen meldingen.</p>
+        <p className="mt-3 text-[13px] text-[#a1a1aa]">This browser doesn't support notifications.</p>
       )}
       {blocked && !on && (
-        <p className="mt-3 text-[13px] text-[#a1a1aa]">Meldingen zijn geblokkeerd in je browser.</p>
+        <p className="mt-3 text-[13px] text-[#a1a1aa]">Notifications are blocked in your browser.</p>
       )}
     </section>
   );

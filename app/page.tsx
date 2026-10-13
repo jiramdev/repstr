@@ -13,7 +13,7 @@ export default async function HomePage() {
   const [dashboard, unreadCount] = await Promise.all([
     getDashboard(userId),
     prisma.appNotification.count({
-      where: { userId, read: false, title: { not: "Rust voorbij" } },
+      where: { userId, read: false, title: { not: "Rest over" } },
     }),
   ]);
 

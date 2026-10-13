@@ -61,8 +61,8 @@ serwist.addEventListeners();
 
 self.addEventListener("push", (event) => {
   let data = {
-    title: "Rust voorbij ⚡️",
-    body: "Tijd voor je volgende set!",
+    title: "Rest over ⚡️",
+    body: "Time for your next set!",
     url: "/workout/active",
     tag: "rest-over",
   };
@@ -77,7 +77,7 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(
     self.registration.showNotification(data.title, {
-      body: data.body || "Tijd voor de volgende set!",
+      body: data.body || "Time for the next set!",
       icon: "/icon.png",
       badge: "/icon.png",
       tag: typeof data.tag === "string" && data.tag ? data.tag : "repiq",

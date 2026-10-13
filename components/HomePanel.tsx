@@ -1,16 +1,16 @@
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import { Bell, Play } from "lucide-react";
 import Prefetch from "@/components/Prefetch";
 import TabLink from "@/components/TabLink";
 
-const dayNamesNL = [
-  "ZONDAG",
-  "MAANDAG",
-  "DINSDAG",
-  "WOENSDAG",
-  "DONDERDAG",
-  "VRIJDAG",
-  "ZATERDAG",
+const dayNamesEN = [
+  "SUNDAY",
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
 ];
 
 export default function HomePanel({
@@ -51,7 +51,7 @@ export default function HomePanel({
           <Link
             href="/notifications"
             prefetch={true}
-            aria-label="Meldingen"
+            aria-label="Notifications"
             className="relative w-10 h-10 rounded-full bg-[#141416] border border-white/[0.08] flex items-center justify-center text-[#a1a1aa] hover:text-white transition apple-press shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
           >
             <Bell className="w-4 h-4 stroke-[1.8]" />
@@ -68,14 +68,18 @@ export default function HomePanel({
             className="block bg-[#141416] border border-white/[0.08] rounded-[34px] px-6 py-9 text-center space-y-3 relative overflow-hidden shadow-[0_16px_36px_rgba(0,0,0,0.25)] transition apple-press"
           >
             <p className="text-[12px] font-semibold tracking-[0.2em] text-[#baa3d0] uppercase">
-              {dayNamesNL[dayOfWeek]}
+              {dayNamesEN[dayOfWeek]}
             </p>
             <h1 className="text-[52px] sm:text-[58px] font-editorial tracking-tight text-white leading-none">
               {todayPlan.name}
             </h1>
             <p className="text-[14px] text-[#a1a1aa] font-medium tracking-tight">
-              {todayPlan.exerciseCount} oefeningen ingepland
+              {todayPlan.exerciseCount} exercises scheduled
             </p>
+            <span className="inline-flex items-center gap-2 bg-[#baa3d0] text-[#141416] rounded-full px-5 py-3 font-editorial text-[16px] tracking-wider">
+              <Play className="w-4 h-4 fill-current" />
+              START WORKOUT
+            </span>
           </Link>
         ) : (
           <TabLink
@@ -83,13 +87,13 @@ export default function HomePanel({
             className="block bg-[#141416] border border-white/[0.08] rounded-[34px] px-6 py-9 text-center space-y-3 relative overflow-hidden shadow-[0_16px_36px_rgba(0,0,0,0.25)] transition apple-press"
           >
             <p className="text-[12px] font-semibold tracking-[0.2em] text-[#baa3d0] uppercase">
-              {dayNamesNL[dayOfWeek]}
+              {dayNamesEN[dayOfWeek]}
             </p>
             <h1 className="text-[52px] sm:text-[58px] font-editorial tracking-tight text-white leading-none">
               REST DAY
             </h1>
             <p className="text-[14px] text-[#a1a1aa] font-medium tracking-tight">
-              Geen training ingeroosterd
+              No workout scheduled
             </p>
           </TabLink>
         )}
@@ -97,14 +101,14 @@ export default function HomePanel({
         <div className="grid grid-cols-2 gap-3.5">
           <div className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 text-center flex flex-col justify-between items-center aspect-square shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
             <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-              Sessies
+              Workouts
             </span>
             <div className="flex-1 flex items-center justify-center">
               <span className="text-[48px] font-editorial tracking-tight text-white leading-none block">
                 {sessionCount}
               </span>
             </div>
-            <span className="text-[12px] text-[#a1a1aa] font-medium">deze maand</span>
+            <span className="text-[12px] text-[#a1a1aa] font-medium">this month</span>
           </div>
 
           <TabLink
@@ -112,14 +116,14 @@ export default function HomePanel({
             className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 text-center flex flex-col justify-between items-center aspect-square shadow-[0_12px_28px_rgba(0,0,0,0.2)] transition apple-press"
           >
             <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-              Gewicht
+              Weight
             </span>
             <div className="flex-1 flex items-center justify-center">
               <span className="text-[48px] font-editorial tracking-tight text-white leading-none block">
                 {latestWeight ?? "--"}
               </span>
             </div>
-            <span className="text-[12px] text-[#a1a1aa] font-medium">kilo</span>
+            <span className="text-[12px] text-[#a1a1aa] font-medium">kg</span>
           </TabLink>
         </div>
       </main>
