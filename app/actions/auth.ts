@@ -6,15 +6,26 @@ import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { passwordRuleError } from "@/lib/password";
 import { TOO_MANY_ATTEMPTS_NL, clientIp, limitSignUp } from "@/lib/rate-limit";
+import { z } from "zod";
+import { emailSchema } from "@/lib/validation";
 
 export async function registerUser(formData: FormData) {
-  const name = formData.get("name") as string;
-  const email = (formData.get("email") as string)?.toLowerCase();
-  const password = formData.get("password") as string;
+  const parsed = z
+    .object({
+      name: z.string().trim().max(80).nullish(),
+      email: emailSchema,
+      password: z.string().max(128),
+    })
+    .safeParse({
+      name: typeof formData.get("name") === "string" ? (formData.get("name") as string) : null,
+      email: typeof formData.get("email") === "string" ? (formData.get("email") as string) : "",
+      password: typeof formData.get("password") === "string" ? (formData.get("password") as string) : "",
+    });
 
-  if (!email || !password) {
+  if (!parsed.success || !parsed.data.password) {
     return { error: "E-mailadres en wachtwoord zijn verplicht." };
   }
+  const { name, email, password } = parsed.data;
 
   const tooShort = passwordRuleError(password);
   if (tooShort) return { error: tooShort };

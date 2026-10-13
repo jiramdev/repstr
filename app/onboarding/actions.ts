@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { refreshUserCache } from "@/lib/queries";
+import { z } from "zod";
 
 function parseOptionalNumber(value: string) {
   const trimmed = value.trim();
@@ -23,22 +24,38 @@ export async function saveOnboarding(input: {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Niet ingelogd");
 
-  const age = parseOptionalNumber(input.age);
-  if (input.age.trim() && (age === null || age < 10 || age > 100)) {
+  const parsed = z
+    .object({
+      age: z.string().max(16),
+      heightCm: z.string().max(16),
+      sex: z.string().max(16),
+      weight: z.string().max(16),
+    })
+    .safeParse({
+      age: input?.age ?? "",
+      heightCm: input?.heightCm ?? "",
+      sex: input?.sex ?? "",
+      weight: input?.weight ?? "",
+    });
+  if (!parsed.success) return { error: "Controleer de velden." };
+  const { age: ageRaw, heightCm: heightRaw, sex: sexRaw, weight: weightRaw } = parsed.data;
+
+  const age = parseOptionalNumber(ageRaw);
+  if (ageRaw.trim() && (age === null || age < 10 || age > 100)) {
     return { error: "Leeftijd moet tussen 10 en 100 liggen." };
   }
 
-  const heightCm = parseOptionalNumber(input.heightCm);
-  if (input.heightCm.trim() && (heightCm === null || heightCm < 80 || heightCm > 250)) {
+  const heightCm = parseOptionalNumber(heightRaw);
+  if (heightRaw.trim() && (heightCm === null || heightCm < 80 || heightCm > 250)) {
     return { error: "Lengte moet tussen 80 en 250 cm liggen." };
   }
 
-  const weight = parseOptionalNumber(input.weight);
-  if (input.weight.trim() && (weight === null || weight <= 0 || weight > 400)) {
+  const weight = parseOptionalNumber(weightRaw);
+  if (weightRaw.trim() && (weight === null || weight <= 0 || weight > 400)) {
     return { error: "Voer een geldig gewicht in." };
   }
 
-  const sex = input.sex === "man" || input.sex === "vrouw" || input.sex === "anders" ? input.sex : null;
+  const sex = sexRaw === "man" || sexRaw === "vrouw" || sexRaw === "anders" ? sexRaw : null;
 
   await prisma.user.update({
     where: { id: session.user.id },

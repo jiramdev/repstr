@@ -6,21 +6,26 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { refreshUserCache } from "@/lib/queries";
 import { revalidateTabs } from "@/lib/revalidate-tabs";
+import { z } from "zod";
+import { dayOfWeekSchema, idSchema, nameSchema } from "@/lib/validation";
 
 // 1. Koppel een plan aan een specifieke dag (0 = Zo, 1 = Ma ... 6 = Za)
 export async function assignPlanToDay(dayOfWeek: number, planId: string | null) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Niet ingelogd");
 
-  if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+  const parsed = z
+    .object({ day: dayOfWeekSchema, planId: idSchema.nullable() })
+    .safeParse({ day: dayOfWeek, planId });
+  if (!parsed.success) {
     throw new Error("Ongeldige dag");
   }
 
   const userId = session.user.id;
 
-  if (planId) {
+  if (parsed.data.planId) {
     const plan = await prisma.workoutPlan.findFirst({
-      where: { id: planId, userId },
+      where: { id: parsed.data.planId, userId },
       select: { id: true },
     });
     if (!plan) throw new Error("Plan niet gevonden");
@@ -38,16 +43,16 @@ export async function assignPlanToDay(dayOfWeek: number, planId: string | null) 
     where: {
       scheduleId_dayOfWeek: {
         scheduleId: weeklySchedule.id,
-        dayOfWeek,
+        dayOfWeek: parsed.data.day,
       },
     },
     update: {
-      planId: planId || null,
+      planId: parsed.data.planId || null,
     },
     create: {
       scheduleId: weeklySchedule.id,
-      dayOfWeek,
-      planId: planId || null,
+      dayOfWeek: parsed.data.day,
+      planId: parsed.data.planId || null,
     },
   });
 
@@ -60,12 +65,13 @@ export async function createWorkoutPlan(name: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Niet ingelogd");
 
-  if (!name.trim()) return null;
+  const parsed = nameSchema.safeParse(name?.trim());
+  if (!parsed.success) return null;
 
   const plan = await prisma.workoutPlan.create({
     data: {
       userId: session.user.id,
-      name: name.trim(),
+      name: parsed.data,
     },
   });
 
