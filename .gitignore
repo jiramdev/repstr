@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# serwist (generated at build time)
+/public/sw.js
+
 # production
 /build
 

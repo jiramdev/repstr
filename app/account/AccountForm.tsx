@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
 import { updateAccount, updatePassword, type AccountInput } from "./actions";
-import { clearWorkoutDraft } from "@/lib/workout-draft";
+import { fullSignOut } from "@/lib/sign-out";
 
 const SEX_OPTIONS = [
   { value: "man", label: "Man" },
@@ -46,8 +45,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
       return;
     }
     if (result?.emailChanged) {
-      await clearWorkoutDraft();
-      await signOut({ callbackUrl: "/login" });
+      await fullSignOut();
       return;
     }
     setEmailPassword("");
@@ -67,8 +65,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
     }
     setCurrentPassword("");
     setNextPassword("");
-    await clearWorkoutDraft();
-    await signOut({ callbackUrl: "/login" });
+    await fullSignOut();
   }
 
   return (
@@ -274,8 +271,7 @@ export default function AccountForm({ initial }: { initial: AccountInput }) {
       <button
         type="button"
         onClick={async () => {
-          await clearWorkoutDraft();
-          await signOut({ callbackUrl: "/login" });
+          await fullSignOut();
         }}
         className="w-full text-[13px] font-semibold tracking-wider text-[#71717a] uppercase py-3 apple-press"
       >

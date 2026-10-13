@@ -21,6 +21,10 @@ const anton = Anton({
 export const metadata: Metadata = {
   title: "repiq",
   description: "Every rep, counted.",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
