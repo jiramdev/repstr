@@ -33,14 +33,14 @@ function refresh(userId: string) {
 export async function createExercise(input: unknown) {
   const userId = await requireUserId();
   const parsed = detailsSchema.safeParse(input);
-  if (!parsed.success) return { error: "Controleer de velden." };
+  if (!parsed.success) return { error: "Check the fields." };
 
   const key = exerciseKey(parsed.data.name);
   const clash = await prisma.exercise.findFirst({
     where: { userId, nameKey: key },
     select: { id: true },
   });
-  if (clash) return { error: "Die oefening bestaat al." };
+  if (clash) return { error: "That exercise already exists." };
 
   const created = await prisma.exercise.create({
     data: {
@@ -61,22 +61,22 @@ export async function createExercise(input: unknown) {
 
 export async function updateExerciseDetails(exerciseId: unknown, input: unknown) {
   const userId = await requireUserId();
-  if (!idSchema.safeParse(exerciseId).success) return { error: "Oefening niet gevonden." };
+  if (!idSchema.safeParse(exerciseId).success) return { error: "Exercise not found." };
   const parsed = detailsSchema.safeParse(input);
-  if (!parsed.success) return { error: "Controleer de velden." };
+  if (!parsed.success) return { error: "Check the fields." };
 
   const owned = await prisma.exercise.findFirst({
     where: { id: exerciseId as string, userId },
     select: { id: true },
   });
-  if (!owned) return { error: "Oefening niet gevonden." };
+  if (!owned) return { error: "Exercise not found." };
 
   const key = exerciseKey(parsed.data.name);
   const clash = await prisma.exercise.findFirst({
     where: { userId, nameKey: key, NOT: { id: owned.id } },
     select: { id: true },
   });
-  if (clash) return { error: "Die oefening bestaat al." };
+  if (clash) return { error: "That exercise already exists." };
 
   await prisma.$transaction([
     prisma.exercise.update({
@@ -110,13 +110,13 @@ const archiveSchema = z.object({ exerciseId: idSchema, archived: z.boolean() });
 export async function setExerciseArchived(input: unknown) {
   const userId = await requireUserId();
   const parsed = archiveSchema.safeParse(input);
-  if (!parsed.success) return { error: "Oefening niet gevonden." };
+  if (!parsed.success) return { error: "Exercise not found." };
 
   const updated = await prisma.exercise.updateMany({
     where: { id: parsed.data.exerciseId, userId },
     data: { archived: parsed.data.archived },
   });
-  if (updated.count === 0) return { error: "Oefening niet gevonden." };
+  if (updated.count === 0) return { error: "Exercise not found." };
 
   refresh(userId);
   return { success: true as const };

@@ -26,6 +26,12 @@ interface ExerciseItem {
   targetSets?: number;
   restSeconds?: number;
   repGoal?: number | null;
+  setsOverride?: number | null;
+  restOverride?: number | null;
+  repGoalOverride?: number | null;
+  defaultSets?: number | null;
+  defaultRepGoal?: number | null;
+  defaultRest?: number | null;
 }
 
 interface LibraryExercise {
@@ -55,6 +61,10 @@ interface PlanEditorProps {
   library: LibraryExercise[];
 }
 
+function targetUnit(tracking: ExerciseTracking) {
+  return tracking === "hold" ? "sec" : "reps";
+}
+
 export default function PlanEditor({
   planId,
   initialName,
@@ -76,9 +86,9 @@ export default function PlanEditor({
   const [isAddingExercise, setIsAddingExercise] = useState(false);
   const [exerciseName, setExerciseName] = useState("");
   const [tracking, setTracking] = useState<ExerciseTracking>("weight");
-  const [targetSets, setTargetSets] = useState("3");
+  const [targetSets, setTargetSets] = useState("");
   const [repGoal, setRepGoal] = useState("");
-  const [restSeconds, setRestSeconds] = useState("90");
+  const [restSeconds, setRestSeconds] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
 
   const [openId, setOpenId] = useState<string | null>(null);
@@ -102,36 +112,47 @@ export default function PlanEditor({
     await updatePlanName(planId, name);
   };
 
-  function parseCount(value: string, min: number, max: number) {
+  function parseOptionalCount(value: string, min: number, max: number): number | null | undefined {
     if (!value.trim()) return null;
     const parsed = Number(value);
-    if (!Number.isInteger(parsed) || parsed < min || parsed > max) return null;
+    if (!Number.isInteger(parsed) || parsed < min || parsed > max) return undefined;
     return parsed;
+  }
+
+  function selectedDefaults() {
+    const key = exerciseName.trim().toLocaleLowerCase("en");
+    const match = library.find((exercise) => exercise.name.trim().toLocaleLowerCase("en") === key);
+    if (!match) return null;
+    return {
+      sets: match.defaultSets ?? 3,
+      goal: match.repGoal,
+      rest: match.restSeconds ?? 90,
+    };
   }
 
   const handleAddExercise = async (e: React.FormEvent) => {
     e.preventDefault();
-    const sets = parseCount(targetSets, 1, 20);
-    const rest = parseCount(restSeconds, 0, 600);
-    const goal = repGoal.trim() ? parseCount(repGoal, 1, 10000) : null;
+    const sets = parseOptionalCount(targetSets, 1, 20);
+    const rest = parseOptionalCount(restSeconds, 0, 600);
+    const goal = parseOptionalCount(repGoal, 1, 10000);
     if (!exerciseName.trim()) {
-      setAddError("Vul een naam in.");
+      setAddError("Enter a name.");
       return;
     }
-    if (sets === null) {
-      setAddError("Aantal sets moet tussen 1 en 20 liggen.");
+    if (sets === undefined) {
+      setAddError("Sets must be between 1 and 20.");
       return;
     }
-    if (rest === null) {
-      setAddError("Rusttijd moet tussen 0 en 600 seconden liggen.");
+    if (rest === undefined) {
+      setAddError("Rest must be between 0 and 600 seconds.");
       return;
     }
-    if (repGoal.trim() && goal === null) {
-      setAddError("Doel moet tussen 1 en 10000 liggen.");
+    if (goal === undefined) {
+      setAddError("Target must be between 1 and 10000.");
       return;
     }
-    const key = exerciseName.trim().toLocaleLowerCase("nl");
-    const match = library.find((exercise) => exercise.name.trim().toLocaleLowerCase("nl") === key);
+    const key = exerciseName.trim().toLocaleLowerCase("en");
+    const match = library.find((exercise) => exercise.name.trim().toLocaleLowerCase("en") === key);
     setAddError(null);
     const result = await addExerciseToPlan(planId, exerciseName, sets, rest, match?.id, tracking, goal);
     if (result?.error) {
@@ -140,9 +161,9 @@ export default function PlanEditor({
     }
     setExerciseName("");
     setTracking("weight");
-    setTargetSets("3");
+    setTargetSets("");
     setRepGoal("");
-    setRestSeconds("90");
+    setRestSeconds("");
     setIsAddingExercise(false);
   };
 
@@ -150,39 +171,40 @@ export default function PlanEditor({
     setEditingId(exercise.id);
     setEditName(exercise.name);
     setEditTracking(exercise.tracking ?? "weight");
-    setEditSets(String(exercise.targetSets ?? 3));
-    setEditRepGoal(exercise.repGoal != null ? String(exercise.repGoal) : "");
-    setEditRest(String(exercise.restSeconds ?? 90));
+    setEditSets(exercise.setsOverride != null ? String(exercise.setsOverride) : "");
+    setEditRepGoal(exercise.repGoalOverride != null ? String(exercise.repGoalOverride) : "");
+    setEditRest(exercise.restOverride != null ? String(exercise.restOverride) : "");
     setEditError(null);
   }
 
   const handleSaveExercise = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingId) return;
-    const sets = parseCount(editSets, 1, 20);
-    const rest = parseCount(editRest, 0, 600);
-    const goal = editRepGoal.trim() ? parseCount(editRepGoal, 1, 10000) : null;
+    const sets = parseOptionalCount(editSets, 1, 20);
+    const rest = parseOptionalCount(editRest, 0, 600);
+    const goal = parseOptionalCount(editRepGoal, 1, 10000);
     if (!editName.trim()) {
-      setEditError("Vul een naam in.");
+      setEditError("Enter a name.");
       return;
     }
-    if (sets === null) {
-      setEditError("Aantal sets moet tussen 1 en 20 liggen.");
+    if (sets === undefined) {
+      setEditError("Sets must be between 1 and 20.");
       return;
     }
-    if (rest === null) {
-      setEditError("Rusttijd moet tussen 0 en 600 seconden liggen.");
+    if (rest === undefined) {
+      setEditError("Rest must be between 0 and 600 seconds.");
       return;
     }
-    if (editRepGoal.trim() && goal === null) {
-      setEditError("Doel moet tussen 1 en 10000 liggen.");
+    if (goal === undefined) {
+      setEditError("Target must be between 1 and 10000.");
       return;
     }
 
-    const currentName = items.find((exercise) => exercise.id === editingId)?.name ?? "";
+    const current = items.find((exercise) => exercise.id === editingId);
+    const currentName = current?.name ?? "";
     if (editName.trim() !== currentName) {
       const confirmed = window.confirm(
-        "Deze naam geldt voor elk schema en alle eerdere logs van deze oefening. Doorgaan?"
+        "This name applies to every plan and all past logs of this exercise. Continue?"
       );
       if (!confirmed) return;
     }
@@ -192,10 +214,23 @@ export default function PlanEditor({
       setEditError(result.error);
       return;
     }
-    setItems((current) =>
-      current.map((exercise) =>
+    const resolvedSets = sets ?? current?.defaultSets ?? current?.targetSets ?? 3;
+    const resolvedRest = rest ?? current?.defaultRest ?? current?.restSeconds ?? 90;
+    const resolvedGoal = goal ?? current?.defaultRepGoal ?? null;
+    setItems((items) =>
+      items.map((exercise) =>
         exercise.id === editingId
-          ? { ...exercise, name: editName.trim(), tracking: editTracking, targetSets: sets, restSeconds: rest, repGoal: goal }
+          ? {
+              ...exercise,
+              name: editName.trim(),
+              tracking: editTracking,
+              targetSets: resolvedSets,
+              restSeconds: resolvedRest,
+              repGoal: resolvedGoal,
+              setsOverride: sets,
+              restOverride: rest,
+              repGoalOverride: goal,
+            }
           : exercise
       )
     );
@@ -307,21 +342,21 @@ export default function PlanEditor({
   };
 
   const handleDeletePlan = async () => {
-    if (confirm("Weet je zeker dat je dit hele plan wilt verwijderen?")) {
+    if (confirm("Are you sure you want to delete this entire plan?")) {
       await deletePlan(planId);
     }
   };
 
   const fieldClass =
     "w-full bg-[#1b1b1e] border border-white/[0.04] rounded-2xl px-4 py-3 text-[14px] text-white placeholder-[#71717a] outline-none focus:border-[#baa3d0]";
-  const ownedNames = new Set(library.map((item) => item.name.trim().toLocaleLowerCase("nl")));
-  const exerciseQuery = exerciseName.trim().toLocaleLowerCase("nl");
-  // Een oefening mag twee keer in een plan, dus er wordt niets uitgefilterd op gebruik.
+  const ownedNames = new Set(library.map((item) => item.name.trim().toLocaleLowerCase("en")));
+  const exerciseQuery = exerciseName.trim().toLocaleLowerCase("en");
+  // An exercise may appear twice in a plan, so nothing is filtered out by use.
   const suggestions = [
     ...library
       .filter((exercise) => {
         if (!exerciseQuery) return true;
-        return exercise.name.toLocaleLowerCase("nl").includes(exerciseQuery);
+        return exercise.name.toLocaleLowerCase("en").includes(exerciseQuery);
       })
       .map((exercise) => ({
         key: exercise.id,
@@ -335,7 +370,7 @@ export default function PlanEditor({
         restSeconds: exercise.restSeconds,
       })),
     ...EXERCISE_LIBRARY.filter((exercise) => {
-      const key = exercise.name.toLocaleLowerCase("nl");
+      const key = exercise.name.toLocaleLowerCase("en");
       if (ownedNames.has(key)) return false;
       if (!exerciseQuery) return true;
       return key.includes(exerciseQuery);
@@ -350,9 +385,10 @@ export default function PlanEditor({
     })),
   ].slice(0, 12);
   const exactOwn = library.find(
-    (exercise) => exercise.name.trim().toLocaleLowerCase("nl") === exerciseQuery
+    (exercise) => exercise.name.trim().toLocaleLowerCase("en") === exerciseQuery
   );
   const showTracking = !exactOwn;
+  const addDefaults = selectedDefaults();
 
   return (
     <div className="space-y-3.5">
@@ -376,7 +412,7 @@ export default function PlanEditor({
               type="submit"
               className="bg-[#baa3d0] text-[#141416] font-semibold px-4 rounded-2xl text-[12px] uppercase tracking-wider apple-press"
             >
-              Opslaan
+              Save
             </button>
           </form>
         ) : (
@@ -385,7 +421,7 @@ export default function PlanEditor({
             onClick={() => setIsEditingTitle(true)}
             className="w-full bg-[#1b1b1e] rounded-2xl px-4 py-3 flex items-center justify-between gap-3 border border-white/[0.04] apple-press"
           >
-            <span className="text-[14px] font-medium text-white shrink-0">Naam</span>
+            <span className="text-[14px] font-medium text-white shrink-0">Name</span>
             <span className="font-editorial text-[22px] text-[#baa3d0] tracking-wider leading-none truncate">
               {name}
             </span>
@@ -396,16 +432,16 @@ export default function PlanEditor({
       <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
         <div className="flex items-center justify-between px-1">
           <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-            Oefeningen
+            Exercises
           </span>
           <button
             type="button"
             onClick={() => setIsAddingExercise(!isAddingExercise)}
-            aria-label="Oefening toevoegen"
+            aria-label="Add exercise"
             className="flex items-center gap-1 text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            Nieuw
+            New
           </button>
         </div>
 
@@ -413,13 +449,13 @@ export default function PlanEditor({
           <form onSubmit={handleAddExercise} className="space-y-2">
             <input
               type="text"
-              placeholder="Zoek of maak een oefening"
+              placeholder="Search or create an exercise"
               value={exerciseName}
               onChange={(e) => {
                 const value = e.target.value;
                 setExerciseName(value);
                 const own = library.find(
-                  (exercise) => exercise.name.trim().toLocaleLowerCase("nl") === value.trim().toLocaleLowerCase("nl")
+                  (exercise) => exercise.name.trim().toLocaleLowerCase("en") === value.trim().toLocaleLowerCase("en")
                 );
                 const fromLibrary = libraryMatch(value);
                 if (own?.tracking === "reps" || own?.tracking === "hold" || own?.tracking === "weight") {
@@ -435,7 +471,7 @@ export default function PlanEditor({
               <div className="max-h-40 space-y-2 overflow-y-auto">
                 {suggestions.map((exercise) => {
                   const selected =
-                    exercise.name.trim().toLocaleLowerCase("nl") === exerciseQuery;
+                    exercise.name.trim().toLocaleLowerCase("en") === exerciseQuery;
                   return (
                     <button
                       key={exercise.key}
@@ -481,36 +517,51 @@ export default function PlanEditor({
               </div>
             )}
             <div className="grid grid-cols-3 gap-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                aria-label="Sets"
-                placeholder="Sets"
-                value={targetSets}
-                onChange={(e) => setTargetSets(e.target.value.replace(/[^\d]/g, ""))}
-                className={`${fieldClass} text-center`}
-              />
-              <input
-                type="text"
-                inputMode="numeric"
-                aria-label="Doel reps of seconden"
-                placeholder="Doel"
-                value={repGoal}
-                onChange={(e) => setRepGoal(e.target.value.replace(/[^\d]/g, ""))}
-                className={`${fieldClass} text-center`}
-              />
-              <input
-                type="text"
-                inputMode="numeric"
-                aria-label="Rust in seconden"
-                placeholder="Rust"
-                value={restSeconds}
-                onChange={(e) => setRestSeconds(e.target.value.replace(/[^\d]/g, ""))}
-                className={`${fieldClass} text-center`}
-              />
+              <label className="block space-y-1">
+                <span className="px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase">
+                  Sets
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  aria-label="Sets override, empty means default"
+                  placeholder={addDefaults ? `Default ${addDefaults.sets}` : "Sets"}
+                  value={targetSets}
+                  onChange={(e) => setTargetSets(e.target.value.replace(/[^\d]/g, ""))}
+                  className={`${fieldClass} text-center`}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase">
+                  Target ({targetUnit(tracking)})
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  aria-label="Target reps or seconds override, empty means default"
+                  placeholder={addDefaults?.goal != null ? `Default ${addDefaults.goal}` : "Target"}
+                  value={repGoal}
+                  onChange={(e) => setRepGoal(e.target.value.replace(/[^\d]/g, ""))}
+                  className={`${fieldClass} text-center`}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase">
+                  Rest (s)
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  aria-label="Rest in seconds override, empty means default"
+                  placeholder={addDefaults ? `Default ${addDefaults.rest}` : "Rest"}
+                  value={restSeconds}
+                  onChange={(e) => setRestSeconds(e.target.value.replace(/[^\d]/g, ""))}
+                  className={`${fieldClass} text-center`}
+                />
+              </label>
             </div>
             <p className="px-1 text-[12px] leading-snug text-[#71717a]">
-              Een oefening mag twee keer in een plan voorkomen.
+              Empty means the exercise default. An exercise may appear twice in a plan.
             </p>
             {addError && <p className="px-1 text-[12px] text-red-300">{addError}</p>}
             <div className="flex gap-2">
@@ -518,14 +569,14 @@ export default function PlanEditor({
                 type="submit"
                 className="flex-1 bg-[#baa3d0] text-[#141416] font-semibold py-3 rounded-2xl text-[12px] uppercase tracking-wider apple-press"
               >
-                Toevoegen
+                Add
               </button>
               <button
                 type="button"
                 onClick={() => setIsAddingExercise(false)}
                 className="px-4 bg-[#1b1b1e] border border-white/[0.04] text-[#a1a1aa] py-3 rounded-2xl text-[12px] uppercase tracking-wider"
               >
-                Annuleer
+                Cancel
               </button>
             </div>
           </form>
@@ -534,7 +585,7 @@ export default function PlanEditor({
         <div ref={listRef} className="space-y-2 pt-1">
           {items.length === 0 ? (
             <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 flex items-center border border-white/[0.04]">
-              <span className="text-[14px] font-medium text-[#71717a]">Nog geen oefeningen</span>
+              <span className="text-[14px] font-medium text-[#71717a]">No exercises yet</span>
             </div>
           ) : (
             items.map((ex, idx) => (
@@ -557,16 +608,21 @@ export default function PlanEditor({
               >
                 {editingId === ex.id ? (
                   <form onSubmit={handleSaveExercise} className="space-y-2">
-                    <input
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      autoFocus
-                      aria-label="Naam van de oefening"
-                      className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white outline-none focus:border-[#baa3d0]"
-                    />
+                    <label className="block space-y-1">
+                      <span className="px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase">
+                        Name
+                      </span>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        autoFocus
+                        aria-label="Exercise name"
+                        className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white outline-none focus:border-[#baa3d0]"
+                      />
+                    </label>
                     <p className="px-1 text-[12px] leading-snug text-[#baa3d0]">
-                      Een andere naam geldt voor elk schema en alle eerdere logs van deze oefening.
+                      A different name applies to every plan and all past logs of this exercise.
                     </p>
                     <div className="grid grid-cols-3 gap-2">
                       {TRACKING_OPTIONS.map((option) => (
@@ -585,45 +641,66 @@ export default function PlanEditor({
                       ))}
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        aria-label="Sets"
-                        value={editSets}
-                        onChange={(e) => setEditSets(e.target.value.replace(/[^\d]/g, ""))}
-                        className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
-                      />
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        aria-label="Doel reps of seconden"
-                        value={editRepGoal}
-                        onChange={(e) => setEditRepGoal(e.target.value.replace(/[^\d]/g, ""))}
-                        className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
-                      />
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        aria-label="Rust in seconden"
-                        value={editRest}
-                        onChange={(e) => setEditRest(e.target.value.replace(/[^\d]/g, ""))}
-                        className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
-                      />
+                      <label className="block space-y-1">
+                        <span className="px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase">
+                          Sets
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          aria-label="Sets override, empty means default"
+                          placeholder={ex.defaultSets != null ? `Default ${ex.defaultSets}` : "Sets"}
+                          value={editSets}
+                          onChange={(e) => setEditSets(e.target.value.replace(/[^\d]/g, ""))}
+                          className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase">
+                          Target ({targetUnit(editTracking)})
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          aria-label="Target reps or seconds override, empty means default"
+                          placeholder={ex.defaultRepGoal != null ? `Default ${ex.defaultRepGoal}` : "Target"}
+                          value={editRepGoal}
+                          onChange={(e) => setEditRepGoal(e.target.value.replace(/[^\d]/g, ""))}
+                          className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase">
+                          Rest (s)
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          aria-label="Rest in seconds override, empty means default"
+                          placeholder={ex.defaultRest != null ? `Default ${ex.defaultRest}` : "Rest"}
+                          value={editRest}
+                          onChange={(e) => setEditRest(e.target.value.replace(/[^\d]/g, ""))}
+                          className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
+                        />
+                      </label>
                     </div>
+                    <p className="px-1 text-[12px] leading-snug text-[#71717a]">
+                      Empty fields use the exercise default.
+                    </p>
                     {editError && <p className="text-[12px] text-red-300">{editError}</p>}
                     <div className="flex gap-2">
                       <button
                         type="submit"
                         className="flex-1 bg-[#baa3d0] text-[#141416] font-semibold py-3 rounded-2xl text-[12px] uppercase tracking-wider apple-press"
                       >
-                        Opslaan
+                        Save
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingId(null)}
                         className="px-4 bg-[#141416] border border-white/[0.08] text-[#a1a1aa] py-3 rounded-2xl text-[12px] uppercase tracking-wider"
                       >
-                        Annuleer
+                        Cancel
                       </button>
                     </div>
                   </form>
@@ -632,7 +709,7 @@ export default function PlanEditor({
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        aria-label="Versleep om te herschikken"
+                        aria-label="Drag to reorder"
                         onPointerDown={(event) => startDrag(event, idx)}
                         onPointerMove={moveDrag}
                         onPointerUp={endDrag}
@@ -644,7 +721,7 @@ export default function PlanEditor({
                       <div className="flex flex-col">
                         <button
                           type="button"
-                          aria-label={`${ex.name} omhoog`}
+                          aria-label={`${ex.name} up`}
                           disabled={idx === 0}
                           onClick={() => moveItem(idx, -1)}
                           className="w-6 h-4 flex items-center justify-center text-[#71717a] disabled:opacity-30"
@@ -653,7 +730,7 @@ export default function PlanEditor({
                         </button>
                         <button
                           type="button"
-                          aria-label={`${ex.name} omlaag`}
+                          aria-label={`${ex.name} down`}
                           disabled={idx === items.length - 1}
                           onClick={() => moveItem(idx, 1)}
                           className="w-6 h-4 flex items-center justify-center text-[#71717a] disabled:opacity-30"
@@ -691,7 +768,7 @@ export default function PlanEditor({
                           className="flex-1 flex items-center justify-center gap-1.5 bg-[#141416] border border-white/[0.08] text-white py-2.5 rounded-2xl text-[12px] uppercase tracking-wider font-semibold apple-press"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
-                          Bewerk
+                          Edit
                         </button>
                         <button
                           type="button"
@@ -699,7 +776,7 @@ export default function PlanEditor({
                           className="flex-1 flex items-center justify-center gap-1.5 bg-[#141416] border border-white/[0.08] text-red-300 py-2.5 rounded-2xl text-[12px] uppercase tracking-wider font-semibold apple-press"
                         >
                           <Trash2 className="w-3.5 h-3.5 stroke-[1.8]" />
-                          Verwijder
+                          Remove
                         </button>
                       </div>
                     )}
@@ -716,7 +793,7 @@ export default function PlanEditor({
         onClick={handleDeletePlan}
         className="w-full bg-[#141416] border border-white/[0.08] rounded-[30px] px-5 py-4 text-[14px] font-medium text-red-300 shadow-[0_12px_28px_rgba(0,0,0,0.2)] apple-press"
       >
-        Plan verwijderen
+        Delete plan
       </button>
     </div>
   );

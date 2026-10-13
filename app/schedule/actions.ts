@@ -18,7 +18,7 @@ export async function assignPlanToDay(dayOfWeek: number, planId: string | null) 
     .object({ day: dayOfWeekSchema, planId: idSchema.nullable() })
     .safeParse({ day: dayOfWeek, planId });
   if (!parsed.success) {
-    throw new Error("Ongeldige dag");
+    throw new Error("Invalid day");
   }
 
   const userId = session.user.id;
@@ -28,7 +28,7 @@ export async function assignPlanToDay(dayOfWeek: number, planId: string | null) 
       where: { id: parsed.data.planId, userId },
       select: { id: true },
     });
-    if (!plan) throw new Error("Plan niet gevonden");
+    if (!plan) throw new Error("Plan not found");
   }
 
   // Zorg dat het WeeklySchedule record bestaat voor de gebruiker

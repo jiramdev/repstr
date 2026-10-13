@@ -32,13 +32,13 @@ export async function updatePlanName(planId: string, name: string) {
   revalidatePath("/");
 }
 
-// 2. Oefening toevoegen aan het plan. Een oefening mag twee keer in een plan;
-// de volgorde per plan blijft uniek.
+// 2. Add an exercise to the plan. An exercise may appear twice per plan;
+// the order per plan stays unique. Empty values fall back to the defaults.
 export async function addExerciseToPlan(
   planId: string,
   exerciseName: string,
-  targetSets: number = 3,
-  restSeconds: number = 90,
+  targetSets?: number | null,
+  restSeconds?: number | null,
   exerciseId?: string | null,
   tracking?: string | null,
   repGoal?: number | null
@@ -47,33 +47,43 @@ export async function addExerciseToPlan(
   if (!session?.user?.id) throw new Error("Not signed in");
 
   const userId = session.user.id;
-  if (!idSchema.safeParse(planId).success) return { error: "Plan niet gevonden." };
+  if (!idSchema.safeParse(planId).success) return { error: "Plan not found." };
   const plan = await prisma.workoutPlan.findFirst({
     where: { id: planId, userId },
     select: { id: true },
   });
-  if (!plan) return { error: "Plan niet gevonden." };
+  if (!plan) return { error: "Plan not found." };
 
   const parsed = z
     .object({
-      sets: setsSchema,
-      rest: restSecondsSchema,
+      sets: setsSchema.nullish(),
+      rest: restSecondsSchema.nullish(),
       goal: z.number().int().min(1).max(10000).nullish(),
     })
-    .safeParse({ sets: Number(targetSets), rest: Number(restSeconds), goal: repGoal ?? null });
+    .safeParse({
+      sets: targetSets ?? null,
+      rest: restSeconds ?? null,
+      goal: repGoal ?? null,
+    });
   if (!parsed.success) {
-    return { error: "Controleer sets, doel en rusttijd." };
+    return { error: "Check sets, target and rest." };
   }
   const { sets, rest, goal } = parsed.data;
 
+  const fallbackSets = sets ?? 3;
+  const fallbackRest = rest ?? 90;
   const exercise = exerciseId
     ? await prisma.exercise.findFirst({ where: { id: exerciseId, userId } })
     : await findOrCreateExercise(userId, exerciseName, tracking, {
-        defaultSets: sets,
+        defaultSets: fallbackSets,
         repGoal: goal,
-        restSeconds: rest,
+        restSeconds: fallbackRest,
       });
-  if (!exercise) return { error: "Vul een naam in." };
+  if (!exercise) return { error: "Enter a name." };
+
+  const resolvedSets = sets ?? exercise.defaultSets;
+  const resolvedRest = rest ?? exercise.restSeconds;
+  const resolvedGoal = goal ?? exercise.repGoal;
 
   const createWithOrder = async (order: number) =>
     prisma.planExercise.create({
@@ -81,8 +91,8 @@ export async function addExerciseToPlan(
         planId,
         exerciseId: exercise.id,
         name: exercise.name,
-        targetSets: sets,
-        restSeconds: rest,
+        targetSets: resolvedSets,
+        restSeconds: resolvedRest,
         setsOverride: sets,
         repGoalOverride: goal,
         restOverride: rest,
@@ -122,8 +132,8 @@ export async function updateExercise(
   planId: string,
   exerciseId: string,
   exerciseName: string,
-  targetSets: number,
-  restSeconds: number,
+  targetSets?: number | null,
+  restSeconds?: number | null,
   tracking?: string | null,
   repGoal?: number | null
 ) {
@@ -135,26 +145,26 @@ export async function updateExercise(
       planId: idSchema,
       placementId: idSchema,
       name: nameSchema,
-      sets: setsSchema,
-      rest: restSecondsSchema,
+      sets: setsSchema.nullish(),
+      rest: restSecondsSchema.nullish(),
       goal: z.number().int().min(1).max(10000).nullish(),
     })
     .safeParse({
       planId,
       placementId: exerciseId,
       name: exerciseName?.trim(),
-      sets: Number(targetSets),
-      rest: Number(restSeconds),
+      sets: targetSets ?? null,
+      rest: restSeconds ?? null,
       goal: repGoal ?? null,
     });
-  if (!parsed.success) return { error: "Controleer de velden." };
+  if (!parsed.success) return { error: "Check the fields." };
   const { name, sets, rest, goal } = parsed.data;
 
   const placement = await prisma.planExercise.findFirst({
     where: { id: exerciseId, planId, plan: { userId: session.user.id } },
     select: { id: true, exerciseId: true, name: true },
   });
-  if (!placement) return { error: "Oefening niet gevonden." };
+  if (!placement) return { error: "Exercise not found." };
 
   const shared =
     (placement.exerciseId
@@ -162,14 +172,14 @@ export async function updateExercise(
           where: { id: placement.exerciseId, userId: session.user.id },
         })
       : null) ?? (await findOrCreateExercise(session.user.id, placement.name));
-  if (!shared) return { error: "Vul een naam in." };
+  if (!shared) return { error: "Enter a name." };
 
   const key = exerciseKey(name);
   const clash = await prisma.exercise.findFirst({
     where: { userId: session.user.id, nameKey: key, NOT: { id: shared.id } },
     select: { id: true },
   });
-  if (clash) return { error: "Die oefening bestaat al." };
+  if (clash) return { error: "That exercise already exists." };
 
   await prisma.$transaction([
     prisma.exercise.update({
@@ -193,8 +203,8 @@ export async function updateExercise(
       data: {
         exerciseId: shared.id,
         name,
-        targetSets: sets,
-        restSeconds: rest,
+        targetSets: sets ?? shared.defaultSets,
+        restSeconds: rest ?? shared.restSeconds,
         setsOverride: sets,
         repGoalOverride: goal,
         restOverride: rest,
@@ -215,7 +225,7 @@ export async function reorderExercises(planId: string, orderedIds: string[]) {
 
   const parsed = z.object({ planId: idSchema, orderedIds: z.array(idSchema).min(1).max(200) }).safeParse({ planId, orderedIds });
   if (!parsed.success) {
-    return { error: "De volgorde kon niet worden opgeslagen." };
+    return { error: "Couldn't save the order." };
   }
   const { planId: validPlanId, orderedIds: validIds } = parsed.data;
 
@@ -228,7 +238,7 @@ export async function reorderExercises(planId: string, orderedIds: string[]) {
     validIds.length !== existing.length ||
     validIds.some((id) => !existingIds.has(id))
   ) {
-    return { error: "De volgorde kon niet worden opgeslagen." };
+    return { error: "Couldn't save the order." };
   }
 
   await prisma.$transaction(

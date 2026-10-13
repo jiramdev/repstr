@@ -67,12 +67,18 @@ export default async function EditPlanPage({ params }: PageProps) {
     targetSets: exercise.setsOverride ?? exercise.exercise?.defaultSets ?? exercise.targetSets,
     restSeconds: exercise.restOverride ?? exercise.exercise?.restSeconds ?? exercise.restSeconds,
     repGoal: exercise.repGoalOverride ?? exercise.exercise?.repGoal ?? null,
+    setsOverride: exercise.setsOverride,
+    restOverride: exercise.restOverride,
+    repGoalOverride: exercise.repGoalOverride,
+    defaultSets: exercise.exercise?.defaultSets ?? null,
+    defaultRepGoal: exercise.exercise?.repGoal ?? null,
+    defaultRest: exercise.exercise?.restSeconds ?? null,
   }));
 
   return (
     <div className="min-h-screen bg-[#baa3d0] text-white pb-32 pt-4 px-4 select-none">
       <main className="max-w-sm mx-auto space-y-3.5">
-        <SubpageHeader title="Bewerk plan" href="/schedule" />
+        <SubpageHeader title="Edit plan" href="/schedule" />
 
         {/* Het interactieve bewerkingsscherm */}
         <PlanEditor

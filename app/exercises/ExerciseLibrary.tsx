@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, ArchiveRestore, Pencil, Plus } from "lucide-react";
+import { Archive, ArchiveRestore, Minus, Pencil, Plus } from "lucide-react";
 import { TRACKING_OPTIONS, type ExerciseTracking } from "@/lib/exercise-library";
 import { createExercise, setExerciseArchived, updateExerciseDetails } from "./actions";
 
@@ -19,8 +19,17 @@ function trackingLabel(tracking: ExerciseTracking) {
   return TRACKING_OPTIONS.find((option) => option.id === tracking)?.label ?? tracking;
 }
 
+function trackingHint(tracking: ExerciseTracking) {
+  if (tracking === "weight") return "Log the lifted weight in kg plus reps per set.";
+  if (tracking === "reps") return "Log reps per set using your own body weight.";
+  return "Log the held seconds per set.";
+}
+
 const fieldClass =
   "w-full bg-[#1b1b1e] border border-white/[0.04] rounded-2xl px-4 py-3 text-[14px] text-white placeholder-[#71717a] outline-none focus:border-[#baa3d0]";
+
+const labelClass =
+  "px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase";
 
 function parseOptionalInt(value: string, min: number, max: number): number | null | undefined {
   if (!value.trim()) return null;
@@ -34,6 +43,108 @@ function parseInt(value: string, min: number, max: number): number | null {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < min || parsed > max) return null;
   return parsed;
+}
+
+function Stepper({
+  label,
+  unit,
+  value,
+  placeholder,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  unit: string;
+  value: string;
+  placeholder?: string;
+  min: number;
+  max: number;
+  onChange: (value: string) => void;
+}) {
+  const current = value.trim() ? Number(value) : null;
+  function step(delta: number) {
+    if (current == null || !Number.isInteger(current)) {
+      onChange(String(delta > 0 ? min : max));
+      return;
+    }
+    const next = current + delta;
+    if (next < min) {
+      onChange("");
+      return;
+    }
+    if (next > max) return;
+    onChange(String(next));
+  }
+  return (
+    <div className="space-y-1">
+      <span className={labelClass}>{label}</span>
+      <div className="flex items-stretch gap-1.5">
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          aria-label={`Decrease ${label}`}
+          className="w-11 shrink-0 bg-[#1b1b1e] border border-white/[0.04] rounded-2xl flex items-center justify-center text-[#a1a1aa] apple-press"
+        >
+          <Minus className="w-4 h-4" />
+        </button>
+        <div className="relative flex-1">
+          <input
+            type="text"
+            inputMode="numeric"
+            aria-label={label}
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, ""))}
+            className="w-full bg-[#1b1b1e] border border-white/[0.04] rounded-2xl pl-4 pr-10 py-3 text-center text-[17px] font-semibold text-white placeholder-[#71717a] placeholder:text-[14px] placeholder:font-normal outline-none focus:border-[#baa3d0]"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-[#71717a] pointer-events-none">
+            {unit}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => step(1)}
+          aria-label={`Increase ${label}`}
+          className="w-11 shrink-0 bg-[#1b1b1e] border border-white/[0.04] rounded-2xl flex items-center justify-center text-[#a1a1aa] apple-press"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TypeSegmented({
+  value,
+  onChange,
+}: {
+  value: ExerciseTracking;
+  onChange: (tracking: ExerciseTracking) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <span className={labelClass}>Type</span>
+      <div className="grid grid-cols-3 gap-2" role="group" aria-label="Exercise type">
+        {TRACKING_OPTIONS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            aria-pressed={value === option.id}
+            onClick={() => onChange(option.id)}
+            className={`py-2.5 rounded-2xl text-[11px] uppercase tracking-wider font-semibold apple-press ${
+              value === option.id
+                ? "bg-[#baa3d0] text-[#141416]"
+                : "bg-[#1b1b1e] border border-white/[0.04] text-[#a1a1aa]"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <p className="px-1 text-[12px] leading-snug text-[#71717a]">{trackingHint(value)}</p>
+    </div>
+  );
 }
 
 export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] }) {
@@ -63,10 +174,10 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
     const sets = parseInt(defaultSets, 1, 20);
     const rest = parseInt(restSeconds, 0, 600);
     const goal = parseOptionalInt(repGoal, 1, 10000);
-    if (!name.trim()) return setFormError("Vul een naam in.");
-    if (sets === null) return setFormError("Standaard sets moet tussen 1 en 20 liggen.");
-    if (rest === null) return setFormError("Rusttijd moet tussen 0 en 600 seconden liggen.");
-    if (goal === undefined) return setFormError("Doel moet tussen 1 en 10000 liggen.");
+    if (!name.trim()) return setFormError("Enter a name.");
+    if (sets === null) return setFormError("Default sets must be between 1 and 20.");
+    if (rest === null) return setFormError("Rest must be between 0 and 600 seconds.");
+    if (goal === undefined) return setFormError("Target must be between 1 and 10000.");
     setFormError(null);
     const result = await createExercise({
       name: name.trim(),
@@ -76,12 +187,12 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
       restSeconds: rest,
     });
     if (!("success" in result) || typeof result.id !== "string") {
-      setFormError(!("success" in result) ? result.error : "Opslaan mislukt.");
+      setFormError(!("success" in result) ? result.error : "Couldn't save.");
       return;
     }
     setItems((current) =>
       [...current, { id: result.id, name: name.trim(), tracking, defaultSets: sets, repGoal: goal, restSeconds: rest, archived: false }].sort((a, b) =>
-        a.name.localeCompare(b.name, "nl")
+        a.name.localeCompare(b.name, "en")
       )
     );
     setName("");
@@ -108,10 +219,10 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
     const sets = parseInt(editSets, 1, 20);
     const rest = parseInt(editRest, 0, 600);
     const goal = parseOptionalInt(editRepGoal, 1, 10000);
-    if (!editName.trim()) return setEditError("Vul een naam in.");
-    if (sets === null) return setEditError("Standaard sets moet tussen 1 en 20 liggen.");
-    if (rest === null) return setEditError("Rusttijd moet tussen 0 en 600 seconden liggen.");
-    if (goal === undefined) return setEditError("Doel moet tussen 1 en 10000 liggen.");
+    if (!editName.trim()) return setEditError("Enter a name.");
+    if (sets === null) return setEditError("Default sets must be between 1 and 20.");
+    if (rest === null) return setEditError("Rest must be between 0 and 600 seconds.");
+    if (goal === undefined) return setEditError("Target must be between 1 and 10000.");
     setEditError(null);
     const result = await updateExerciseDetails(editingId, {
       name: editName.trim(),
@@ -136,7 +247,7 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
 
   const handleArchive = async (item: LibraryItem) => {
     const next = !item.archived;
-    if (next && !confirm(`“${item.name}” archiveren? Hij verdwijnt uit de keuzelijsten.`)) return;
+    if (next && !confirm(`Archive "${item.name}"? It will disappear from the pickers.`)) return;
     setItems((current) => current.map((row) => (row.id === item.id ? { ...row, archived: next } : row)));
     const result = await setExerciseArchived({ exerciseId: item.id, archived: next });
     if (!("success" in result)) {
@@ -149,89 +260,75 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
       <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
         <div className="flex items-center justify-between px-1">
           <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-            Oefeningen
+            Exercises
           </span>
           <button
             type="button"
             onClick={() => setIsCreating(!isCreating)}
-            aria-label="Oefening toevoegen"
+            aria-label="Add exercise"
             className="flex items-center gap-1 text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            Nieuw
+            New
           </button>
         </div>
 
         {isCreating && (
-          <form onSubmit={handleCreate} className="space-y-2">
-            <input
-              type="text"
-              placeholder="Naam, bijv. Squat"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-              maxLength={80}
-              className={fieldClass}
+          <form onSubmit={handleCreate} className="space-y-3">
+            <div className="space-y-1">
+              <span className={labelClass}>Name</span>
+              <input
+                type="text"
+                placeholder="E.g. Squat"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+                maxLength={80}
+                className={fieldClass}
+              />
+            </div>
+            <TypeSegmented value={tracking} onChange={setTracking} />
+            <Stepper
+              label="Default sets"
+              unit="sets"
+              value={defaultSets}
+              placeholder="3"
+              min={1}
+              max={20}
+              onChange={setDefaultSets}
             />
-            <div className="grid grid-cols-3 gap-2">
-              {TRACKING_OPTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setTracking(option.id)}
-                  className={`py-2.5 rounded-2xl text-[11px] uppercase tracking-wider font-semibold ${
-                    tracking === option.id
-                      ? "bg-[#baa3d0] text-[#141416]"
-                      : "bg-[#1b1b1e] border border-white/[0.04] text-[#a1a1aa]"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                aria-label="Standaard sets"
-                placeholder="Sets"
-                value={defaultSets}
-                onChange={(e) => setDefaultSets(e.target.value.replace(/[^\d]/g, ""))}
-                className={`${fieldClass} text-center`}
-              />
-              <input
-                type="text"
-                inputMode="numeric"
-                aria-label="Doel reps of seconden"
-                placeholder="Doel"
-                value={repGoal}
-                onChange={(e) => setRepGoal(e.target.value.replace(/[^\d]/g, ""))}
-                className={`${fieldClass} text-center`}
-              />
-              <input
-                type="text"
-                inputMode="numeric"
-                aria-label="Rust in seconden"
-                placeholder="Rust"
-                value={restSeconds}
-                onChange={(e) => setRestSeconds(e.target.value.replace(/[^\d]/g, ""))}
-                className={`${fieldClass} text-center`}
-              />
-            </div>
+            <Stepper
+              label={tracking === "hold" ? "Target (seconds)" : "Target (reps)"}
+              unit={tracking === "hold" ? "sec" : "reps"}
+              value={repGoal}
+              placeholder="None"
+              min={1}
+              max={10000}
+              onChange={setRepGoal}
+            />
+            <Stepper
+              label="Rest"
+              unit="s"
+              value={restSeconds}
+              placeholder="90"
+              min={0}
+              max={600}
+              onChange={setRestSeconds}
+            />
             {formError && <p className="px-1 text-[12px] text-red-300">{formError}</p>}
             <div className="flex gap-2">
               <button
                 type="submit"
                 className="flex-1 bg-[#baa3d0] text-[#141416] font-semibold py-3 rounded-2xl text-[12px] uppercase tracking-wider apple-press"
               >
-                Toevoegen
+                Save
               </button>
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}
                 className="px-4 bg-[#1b1b1e] border border-white/[0.04] text-[#a1a1aa] py-3 rounded-2xl text-[12px] uppercase tracking-wider"
               >
-                Annuleer
+                Cancel
               </button>
             </div>
           </form>
@@ -240,7 +337,7 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
         <div className="space-y-2 pt-1">
           {visible.length === 0 ? (
             <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04]">
-              <span className="text-[14px] font-medium text-[#71717a]">Nog geen oefeningen</span>
+              <span className="text-[14px] font-medium text-[#71717a]">No exercises yet</span>
             </div>
           ) : (
             visible.map((item) => (
@@ -249,74 +346,73 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
                 className="bg-[#1b1b1e] border border-white/[0.04] rounded-2xl px-4 py-3"
               >
                 {editingId === item.id ? (
-                  <form onSubmit={handleSave} className="space-y-2">
-                    <input
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      autoFocus
-                      maxLength={80}
-                      aria-label="Naam van de oefening"
-                      className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white outline-none focus:border-[#baa3d0]"
+                  <form onSubmit={handleSave} className="space-y-3">
+                    <div className="space-y-1">
+                      <span className={labelClass}>Name</span>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        autoFocus
+                        maxLength={80}
+                        aria-label="Exercise name"
+                        className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white outline-none focus:border-[#baa3d0]"
+                      />
+                    </div>
+                    <TypeSegmented value={editTracking} onChange={setEditTracking} />
+                    <Stepper
+                      label="Default sets"
+                      unit="sets"
+                      value={editSets}
+                      placeholder="3"
+                      min={1}
+                      max={20}
+                      onChange={setEditSets}
                     />
-                    <div className="grid grid-cols-3 gap-2">
-                      {TRACKING_OPTIONS.map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => setEditTracking(option.id)}
-                          className={`py-2.5 rounded-2xl text-[11px] uppercase tracking-wider font-semibold ${
-                            editTracking === option.id
-                              ? "bg-[#baa3d0] text-[#141416]"
-                              : "bg-[#141416] border border-white/[0.08] text-[#a1a1aa]"
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        aria-label="Standaard sets"
-                        value={editSets}
-                        onChange={(e) => setEditSets(e.target.value.replace(/[^\d]/g, ""))}
-                        className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
-                      />
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        aria-label="Doel reps of seconden"
-                        value={editRepGoal}
-                        onChange={(e) => setEditRepGoal(e.target.value.replace(/[^\d]/g, ""))}
-                        className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
-                      />
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        aria-label="Rust in seconden"
-                        value={editRest}
-                        onChange={(e) => setEditRest(e.target.value.replace(/[^\d]/g, ""))}
-                        className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
-                      />
-                    </div>
+                    <Stepper
+                      label={editTracking === "hold" ? "Target (seconds)" : "Target (reps)"}
+                      unit={editTracking === "hold" ? "sec" : "reps"}
+                      value={editRepGoal}
+                      placeholder="None"
+                      min={1}
+                      max={10000}
+                      onChange={setEditRepGoal}
+                    />
+                    <Stepper
+                      label="Rest"
+                      unit="s"
+                      value={editRest}
+                      placeholder="90"
+                      min={0}
+                      max={600}
+                      onChange={setEditRest}
+                    />
                     {editError && <p className="text-[12px] text-red-300">{editError}</p>}
                     <div className="flex gap-2">
                       <button
                         type="submit"
                         className="flex-1 bg-[#baa3d0] text-[#141416] font-semibold py-3 rounded-2xl text-[12px] uppercase tracking-wider apple-press"
                       >
-                        Opslaan
+                        Save
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingId(null)}
                         className="px-4 bg-[#141416] border border-white/[0.08] text-[#a1a1aa] py-3 rounded-2xl text-[12px] uppercase tracking-wider"
                       >
-                        Annuleer
+                        Cancel
                       </button>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(null);
+                        handleArchive(item);
+                      }}
+                      className="w-full text-center text-[12px] font-semibold text-red-300/70 py-1 apple-press"
+                    >
+                      {item.archived ? "Restore from archive" : "Archive exercise"}
+                    </button>
                   </form>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -325,15 +421,15 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
                       <p className="text-[11px] text-[#71717a]">
                         {trackingLabel(item.tracking)} · {item.defaultSets} sets
                         {item.repGoal != null
-                          ? ` · doel ${item.repGoal} ${item.tracking === "hold" ? "sec" : "reps"}`
+                          ? ` · target ${item.repGoal} ${item.tracking === "hold" ? "sec" : "reps"}`
                           : ""}
-                        {` · rust ${item.restSeconds}s`}
+                        {` · rest ${item.restSeconds}s`}
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => startEdit(item)}
-                      aria-label={`${item.name} bewerken`}
+                      aria-label={`Edit ${item.name}`}
                       className="w-9 h-9 rounded-full flex items-center justify-center text-[#a1a1aa] hover:text-white apple-press shrink-0"
                     >
                       <Pencil className="w-4 h-4" />
@@ -341,7 +437,7 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
                     <button
                       type="button"
                       onClick={() => handleArchive(item)}
-                      aria-label={item.archived ? `${item.name} terugzetten` : `${item.name} archiveren`}
+                      aria-label={item.archived ? `Restore ${item.name}` : `Archive ${item.name}`}
                       className="w-9 h-9 rounded-full flex items-center justify-center text-[#71717a] hover:text-white apple-press shrink-0"
                     >
                       {item.archived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
@@ -359,7 +455,7 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
             onClick={() => setShowArchived(!showArchived)}
             className="w-full text-center text-[12px] font-semibold text-[#71717a] apple-press"
           >
-            {showArchived ? "Gearchiveerd verbergen" : `Gearchiveerd tonen (${archivedCount})`}
+            {showArchived ? "Hide archived" : `Show archived (${archivedCount})`}
           </button>
         )}
       </section>
