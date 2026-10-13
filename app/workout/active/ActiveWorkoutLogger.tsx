@@ -345,7 +345,18 @@ export default function ActiveWorkoutLogger({
   const [isFinishing, setFinishing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [rowsByExercise, setRowsByExercise] = useState<Record<string, SetRow[]>>(() => {
+  const [rowsByExercise, setRowsByExercise] = useState<Record<string, SetRow[]>>(() =>
+    buildInitialRows(exercises, null, initialSession)
+  );
+  const [step, setStep] = useState(0);
+  const mergedCache = useRef(false);
+
+  useEffect(() => {
+    // Merge the local cache after mount (client only, so SSR stays clean).
+    // The server is the source of truth: logged entries always win.
+    if (mergedCache.current) return;
+    mergedCache.current = true;
+    /* eslint-disable react-hooks/set-state-in-effect -- one-time local cache hydration after mount */
     let cached: Record<string, unknown> | null = null;
     try {
       const raw = localStorage.getItem(setsKey);
@@ -353,18 +364,23 @@ export default function ActiveWorkoutLogger({
     } catch {
       cached = null;
     }
-    return buildInitialRows(exercises, cached, initialSession);
-  });
-  const [step, setStep] = useState(() => {
-    const raw = Number(localStorage.getItem(stepKey));
-    return Number.isInteger(raw) && raw >= 0 && raw < exercises.length ? raw : 0;
-  });
+    if (cached) setRowsByExercise(buildInitialRows(exercises, cached, initialSession));
+    const rawStep = Number(localStorage.getItem(stepKey));
+    if (Number.isInteger(rawStep) && rawStep >= 0 && rawStep < exercises.length) {
+      setStep(rawStep);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [exercises, initialSession, setsKey, stepKey]);
 
   const restTarget = useDraftValue(targetKey, parseTarget, null);
 
   useEffect(() => {
     migrateLegacyDraft(userId, planId);
-  }, [userId, planId]);
+    // Refresh the route on mount so a revisit to the same workout URL never
+    // shows a cached document: placeholders and session state come fresh
+    // from the server. Props flow straight into the placeholders below.
+    router.refresh();
+  }, [userId, planId, router]);
 
   // Start (or resume) the server-side session. The server is the source of truth.
   useEffect(() => {

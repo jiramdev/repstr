@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { unstable_cache, updateTag } from "next/cache";
+import { revalidateTag, unstable_cache, updateTag } from "next/cache";
 import prisma from "@/lib/prisma";
 import { amsterdamParts, amsterdamStartOfMonth } from "@/lib/amsterdam";
 import { asTracking } from "@/lib/exercise-library";
@@ -9,7 +9,11 @@ export function userCacheTag(userId: string) {
 }
 
 export function refreshUserCache(userId: string) {
-  updateTag(userCacheTag(userId));
+  const tag = userCacheTag(userId);
+  // updateTag covers "use cache" entries; revalidateTag covers unstable_cache.
+  // This codebase reads through unstable_cache, so revalidateTag does the work.
+  updateTag(tag);
+  revalidateTag(tag, "max");
 }
 
 function cached<T>(userId: string, key: string, load: () => Promise<T>) {
@@ -108,9 +112,10 @@ export function getSchedule(userId: string) {
   });
 }
 
-export function getActiveWorkout(userId: string, planId?: string) {
-  return cached(userId, `active-sets:${planId ?? "none"}`, async () => {
-    const plan = planId
+export async function getActiveWorkout(userId: string, planId?: string) {
+  // NOTE: intentionally uncached. This read must reflect sets logged seconds
+  // ago; a stale entry here shows wrong placeholders mid-workout.
+  const plan = planId
       ? await prisma.workoutPlan.findFirst({
           where: { id: planId, userId },
           select: {
@@ -206,7 +211,6 @@ export function getActiveWorkout(userId: string, planId?: string) {
     }
 
     return { exercises, previousSets };
-  });
 }
 
 export async function getActiveSession(userId: string) {

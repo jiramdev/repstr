@@ -28,7 +28,7 @@ vi.mock("next-auth", () => ({ getServerSession }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
 vi.mock("@/lib/queries", () => ({ refreshUserCache: vi.fn() }));
 vi.mock("@/lib/revalidate-tabs", () => ({ revalidateTabs: vi.fn() }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), unstable_cache: (fn: unknown) => fn, updateTag: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), unstable_cache: (fn: unknown) => fn, updateTag: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn((url: string) => { throw new Error(`redirect:${url}`); }) }));
 vi.mock("@/lib/prisma", () => ({
   default: {

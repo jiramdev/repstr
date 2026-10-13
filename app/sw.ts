@@ -1,5 +1,5 @@
 import type { PrecacheEntry, RuntimeCaching, SerwistGlobalConfig } from "serwist";
-import { NetworkOnly, Serwist, StaleWhileRevalidate } from "serwist";
+import { NetworkFirst, NetworkOnly, Serwist } from "serwist";
 
 interface PushEventLike {
   data: {
@@ -49,8 +49,10 @@ const serwist = new Serwist({
       handler: new NetworkOnly(),
     } satisfies RuntimeCaching,
     {
+      // Dynamic, authenticated documents must never serve stale: try the
+      // network first, fall back to cache only when fully offline.
       matcher: ({ request }) => request.mode === "navigate",
-      handler: new StaleWhileRevalidate({ cacheName: "repiq-pages" }),
+      handler: new NetworkFirst({ cacheName: "repiq-pages", networkTimeoutSeconds: 3 }),
     } satisfies RuntimeCaching,
   ],
 });

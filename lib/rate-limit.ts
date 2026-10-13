@@ -85,9 +85,13 @@ export async function checkRateLimit(
 ): Promise<LimitDecision> {
   const active = limiter(limit, windowMs);
   if (!active) {
-    if (process.env.NODE_ENV === "production") {
+    // Test-only escape hatch for local e2e runs (never set in production).
+    if (process.env.NODE_ENV === "production" && process.env.ALLOW_MEMORY_RATELIMIT !== "1") {
       console.error("Upstash Redis niet ingesteld; rate limit fail closed");
       return { limited: true };
+    }
+    if (process.env.NODE_ENV === "production") {
+      console.warn("Rate limit valt terug op geheugen (ALLOW_MEMORY_RATELIMIT, alleen voor tests)");
     }
     const limited = isRateLimited(key, limit, windowMs);
     if (!limited) recordAttempt(key, windowMs);
