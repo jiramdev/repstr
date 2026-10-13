@@ -11,7 +11,8 @@ export function exerciseKey(name: string) {
 export async function findOrCreateExercise(
   userId: string,
   rawName: string,
-  tracking?: string | null
+  tracking?: string | null,
+  defaults?: { defaultSets?: number; repGoal?: number | null; restSeconds?: number } | null
 ) {
   const name = rawName.trim();
   const nameKey = exerciseKey(name);
@@ -28,7 +29,15 @@ export async function findOrCreateExercise(
 
   try {
     return await prisma.exercise.create({
-      data: { userId, name, nameKey, tracking: resolved },
+      data: {
+        userId,
+        name,
+        nameKey,
+        tracking: resolved,
+        defaultSets: defaults?.defaultSets ?? 3,
+        repGoal: defaults?.repGoal ?? null,
+        restSeconds: defaults?.restSeconds ?? 90,
+      },
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

@@ -105,7 +105,19 @@ export default function ScheduleManager({ plans, initialDays }: ScheduleManagerP
         </div>
       </section>
 
-      {/* 2. Trainingsplannen Beheren & Aanmaken */}
+      {/* 2. Oefeningenbibliotheek */}
+      <Link
+        href="/exercises"
+        prefetch={true}
+        className="bg-[#141416] border border-white/[0.08] rounded-[30px] px-5 py-4 flex items-center justify-between gap-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)] apple-press"
+      >
+        <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
+          Oefeningen beheren
+        </span>
+        <ChevronRight className="w-4 h-4 text-[#52525b]" />
+      </Link>
+
+      {/* 3. Trainingsplannen Beheren & Aanmaken */}
       <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
         <div className="flex items-center justify-between px-1">
           <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">

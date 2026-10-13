@@ -26,14 +26,32 @@ export default async function EditPlanPage({ params }: PageProps) {
       include: {
         exercises: {
           orderBy: { order: "asc" },
-          include: { exercise: { select: { id: true, name: true, tracking: true } } },
+          include: {
+            exercise: {
+              select: {
+                id: true,
+                name: true,
+                tracking: true,
+                defaultSets: true,
+                repGoal: true,
+                restSeconds: true,
+              },
+            },
+          },
         },
       },
     }),
     prisma.exercise.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, archived: false },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, tracking: true },
+      select: {
+        id: true,
+        name: true,
+        tracking: true,
+        defaultSets: true,
+        repGoal: true,
+        restSeconds: true,
+      },
     }),
   ]);
 
@@ -46,8 +64,9 @@ export default async function EditPlanPage({ params }: PageProps) {
     exerciseId: exercise.exerciseId,
     name: exercise.exercise?.name ?? exercise.name,
     tracking: asTracking(exercise.exercise?.tracking),
-    targetSets: exercise.targetSets,
-    restSeconds: exercise.restSeconds,
+    targetSets: exercise.setsOverride ?? exercise.exercise?.defaultSets ?? exercise.targetSets,
+    restSeconds: exercise.restOverride ?? exercise.exercise?.restSeconds ?? exercise.restSeconds,
+    repGoal: exercise.repGoalOverride ?? exercise.exercise?.repGoal ?? null,
   }));
 
   return (

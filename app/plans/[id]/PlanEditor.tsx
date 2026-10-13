@@ -25,12 +25,16 @@ interface ExerciseItem {
   tracking?: ExerciseTracking;
   targetSets?: number;
   restSeconds?: number;
+  repGoal?: number | null;
 }
 
 interface LibraryExercise {
   id: string;
   name: string;
   tracking?: string;
+  defaultSets?: number;
+  repGoal?: number | null;
+  restSeconds?: number;
 }
 
 interface DragState {
@@ -73,6 +77,7 @@ export default function PlanEditor({
   const [exerciseName, setExerciseName] = useState("");
   const [tracking, setTracking] = useState<ExerciseTracking>("weight");
   const [targetSets, setTargetSets] = useState("3");
+  const [repGoal, setRepGoal] = useState("");
   const [restSeconds, setRestSeconds] = useState("90");
   const [addError, setAddError] = useState<string | null>(null);
 
@@ -81,6 +86,7 @@ export default function PlanEditor({
   const [editName, setEditName] = useState("");
   const [editTracking, setEditTracking] = useState<ExerciseTracking>("weight");
   const [editSets, setEditSets] = useState("");
+  const [editRepGoal, setEditRepGoal] = useState("");
   const [editRest, setEditRest] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -107,6 +113,7 @@ export default function PlanEditor({
     e.preventDefault();
     const sets = parseCount(targetSets, 1, 20);
     const rest = parseCount(restSeconds, 0, 600);
+    const goal = repGoal.trim() ? parseCount(repGoal, 1, 10000) : null;
     if (!exerciseName.trim()) {
       setAddError("Vul een naam in.");
       return;
@@ -119,10 +126,14 @@ export default function PlanEditor({
       setAddError("Rusttijd moet tussen 0 en 600 seconden liggen.");
       return;
     }
+    if (repGoal.trim() && goal === null) {
+      setAddError("Doel moet tussen 1 en 10000 liggen.");
+      return;
+    }
     const key = exerciseName.trim().toLocaleLowerCase("nl");
     const match = library.find((exercise) => exercise.name.trim().toLocaleLowerCase("nl") === key);
     setAddError(null);
-    const result = await addExerciseToPlan(planId, exerciseName, sets, rest, match?.id, tracking);
+    const result = await addExerciseToPlan(planId, exerciseName, sets, rest, match?.id, tracking, goal);
     if (result?.error) {
       setAddError(result.error);
       return;
@@ -130,6 +141,7 @@ export default function PlanEditor({
     setExerciseName("");
     setTracking("weight");
     setTargetSets("3");
+    setRepGoal("");
     setRestSeconds("90");
     setIsAddingExercise(false);
   };
@@ -139,6 +151,7 @@ export default function PlanEditor({
     setEditName(exercise.name);
     setEditTracking(exercise.tracking ?? "weight");
     setEditSets(String(exercise.targetSets ?? 3));
+    setEditRepGoal(exercise.repGoal != null ? String(exercise.repGoal) : "");
     setEditRest(String(exercise.restSeconds ?? 90));
     setEditError(null);
   }
@@ -148,6 +161,7 @@ export default function PlanEditor({
     if (!editingId) return;
     const sets = parseCount(editSets, 1, 20);
     const rest = parseCount(editRest, 0, 600);
+    const goal = editRepGoal.trim() ? parseCount(editRepGoal, 1, 10000) : null;
     if (!editName.trim()) {
       setEditError("Vul een naam in.");
       return;
@@ -160,6 +174,10 @@ export default function PlanEditor({
       setEditError("Rusttijd moet tussen 0 en 600 seconden liggen.");
       return;
     }
+    if (editRepGoal.trim() && goal === null) {
+      setEditError("Doel moet tussen 1 en 10000 liggen.");
+      return;
+    }
 
     const currentName = items.find((exercise) => exercise.id === editingId)?.name ?? "";
     if (editName.trim() !== currentName) {
@@ -169,7 +187,7 @@ export default function PlanEditor({
       if (!confirmed) return;
     }
 
-    const result = await updateExercise(planId, editingId, editName, sets, rest, editTracking);
+    const result = await updateExercise(planId, editingId, editName, sets, rest, editTracking, goal);
     if (result?.error) {
       setEditError(result.error);
       return;
@@ -177,7 +195,7 @@ export default function PlanEditor({
     setItems((current) =>
       current.map((exercise) =>
         exercise.id === editingId
-          ? { ...exercise, name: editName.trim(), tracking: editTracking, targetSets: sets, restSeconds: rest }
+          ? { ...exercise, name: editName.trim(), tracking: editTracking, targetSets: sets, restSeconds: rest, repGoal: goal }
           : exercise
       )
     );
@@ -296,16 +314,12 @@ export default function PlanEditor({
 
   const fieldClass =
     "w-full bg-[#1b1b1e] border border-white/[0.04] rounded-2xl px-4 py-3 text-[14px] text-white placeholder-[#71717a] outline-none focus:border-[#baa3d0]";
-  const usedExerciseIds = new Set(
-    items.map((item) => item.exerciseId).filter((id): id is string => Boolean(id))
-  );
-  const usedNames = new Set(items.map((item) => item.name.trim().toLocaleLowerCase("nl")));
   const ownedNames = new Set(library.map((item) => item.name.trim().toLocaleLowerCase("nl")));
   const exerciseQuery = exerciseName.trim().toLocaleLowerCase("nl");
+  // Een oefening mag twee keer in een plan, dus er wordt niets uitgefilterd op gebruik.
   const suggestions = [
     ...library
       .filter((exercise) => {
-        if (usedExerciseIds.has(exercise.id)) return false;
         if (!exerciseQuery) return true;
         return exercise.name.toLocaleLowerCase("nl").includes(exerciseQuery);
       })
@@ -316,10 +330,13 @@ export default function PlanEditor({
         tracking: (exercise.tracking === "reps" || exercise.tracking === "hold"
           ? exercise.tracking
           : "weight") as ExerciseTracking,
+        defaultSets: exercise.defaultSets,
+        repGoal: exercise.repGoal,
+        restSeconds: exercise.restSeconds,
       })),
     ...EXERCISE_LIBRARY.filter((exercise) => {
       const key = exercise.name.toLocaleLowerCase("nl");
-      if (ownedNames.has(key) || usedNames.has(key)) return false;
+      if (ownedNames.has(key)) return false;
       if (!exerciseQuery) return true;
       return key.includes(exerciseQuery);
     }).map((exercise) => ({
@@ -327,6 +344,9 @@ export default function PlanEditor({
       id: null as string | null,
       name: exercise.name,
       tracking: exercise.tracking,
+      defaultSets: undefined as number | undefined,
+      repGoal: undefined as number | null | undefined,
+      restSeconds: undefined as number | undefined,
     })),
   ].slice(0, 12);
   const exactOwn = library.find(
@@ -423,6 +443,9 @@ export default function PlanEditor({
                       onClick={() => {
                         setExerciseName(exercise.name);
                         setTracking(exercise.tracking);
+                        if (exercise.defaultSets) setTargetSets(String(exercise.defaultSets));
+                        if (exercise.repGoal != null) setRepGoal(String(exercise.repGoal));
+                        if (exercise.restSeconds) setRestSeconds(String(exercise.restSeconds));
                       }}
                       className={`w-full bg-[#1b1b1e] rounded-2xl px-4 py-3 flex items-center justify-between gap-3 border text-left apple-press ${
                         selected ? "border-[#baa3d0]" : "border-white/[0.04]"
@@ -457,7 +480,7 @@ export default function PlanEditor({
                 ))}
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <input
                 type="text"
                 inputMode="numeric"
@@ -470,6 +493,15 @@ export default function PlanEditor({
               <input
                 type="text"
                 inputMode="numeric"
+                aria-label="Doel reps of seconden"
+                placeholder="Doel"
+                value={repGoal}
+                onChange={(e) => setRepGoal(e.target.value.replace(/[^\d]/g, ""))}
+                className={`${fieldClass} text-center`}
+              />
+              <input
+                type="text"
+                inputMode="numeric"
                 aria-label="Rust in seconden"
                 placeholder="Rust"
                 value={restSeconds}
@@ -477,6 +509,9 @@ export default function PlanEditor({
                 className={`${fieldClass} text-center`}
               />
             </div>
+            <p className="px-1 text-[12px] leading-snug text-[#71717a]">
+              Een oefening mag twee keer in een plan voorkomen.
+            </p>
             {addError && <p className="px-1 text-[12px] text-red-300">{addError}</p>}
             <div className="flex gap-2">
               <button
@@ -549,13 +584,21 @@ export default function PlanEditor({
                         </button>
                       ))}
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <input
                         type="text"
                         inputMode="numeric"
                         aria-label="Sets"
                         value={editSets}
                         onChange={(e) => setEditSets(e.target.value.replace(/[^\d]/g, ""))}
+                        className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        aria-label="Doel reps of seconden"
+                        value={editRepGoal}
+                        onChange={(e) => setEditRepGoal(e.target.value.replace(/[^\d]/g, ""))}
                         className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
                       />
                       <input
@@ -631,6 +674,12 @@ export default function PlanEditor({
                           {ex.targetSets ?? 3}
                           <span className="px-1">·</span>
                           {ex.restSeconds ?? 90}
+                          {ex.repGoal != null && (
+                            <>
+                              <span className="px-1">·</span>
+                              {ex.repGoal}
+                            </>
+                          )}
                         </span>
                       </button>
                     </div>
