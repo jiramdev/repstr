@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getActiveWorkout } from "@/lib/queries";
+import { getActiveSession, getActiveWorkout } from "@/lib/queries";
 import { redirect } from "next/navigation";
 import SubpageHeader from "@/components/SubpageHeader";
 import ActiveWorkoutLogger from "./ActiveWorkoutLogger";
@@ -16,7 +16,10 @@ export default async function ActiveWorkoutPage({ searchParams }: PageProps) {
   if (!session?.user?.id) redirect("/login");
 
   const { planId } = await searchParams;
-  const workout = await getActiveWorkout(session.user.id, planId);
+  // Resume the in-progress session from the server, even on another device.
+  const activeSession = await getActiveSession(session.user.id);
+  const effectivePlanId = activeSession?.planId ?? planId;
+  const workout = await getActiveWorkout(session.user.id, effectivePlanId ?? undefined);
 
   return (
     <div className="min-h-screen bg-[#baa3d0] text-white pb-10 pt-4 px-4 select-none">
@@ -40,9 +43,19 @@ export default async function ActiveWorkoutPage({ searchParams }: PageProps) {
         ) : (
           <ActiveWorkoutLogger
             userId={session.user.id}
-            planId={planId}
+            planId={effectivePlanId}
             exercises={workout.exercises}
             previousSets={workout.previousSets}
+            initialSession={
+              activeSession
+                ? {
+                    id: activeSession.id,
+                    planId: activeSession.planId,
+                    startedAt: activeSession.startedAt.toISOString(),
+                    entries: activeSession.entries,
+                  }
+                : null
+            }
           />
         )}
       </main>

@@ -121,7 +121,12 @@ export function getActiveWorkout(userId: string, planId?: string) {
                 exerciseId: true,
                 targetSets: true,
                 restSeconds: true,
-                exercise: { select: { name: true, tracking: true } },
+                setsOverride: true,
+                repGoalOverride: true,
+                restOverride: true,
+                exercise: {
+                  select: { name: true, tracking: true, defaultSets: true, repGoal: true, restSeconds: true },
+                },
               },
               orderBy: { order: "asc" },
             },
@@ -134,8 +139,9 @@ export function getActiveWorkout(userId: string, planId?: string) {
       exerciseId: exercise.exerciseId,
       name: exercise.exercise?.name ?? exercise.name,
       tracking: asTracking(exercise.exercise?.tracking),
-      targetSets: exercise.targetSets,
-      restSeconds: exercise.restSeconds,
+      targetSets: exercise.setsOverride ?? exercise.exercise?.defaultSets ?? exercise.targetSets,
+      restSeconds: exercise.restOverride ?? exercise.exercise?.restSeconds ?? exercise.restSeconds,
+      repGoal: exercise.repGoalOverride ?? exercise.exercise?.repGoal ?? null,
     }));
 
     const exerciseIds = exercises
@@ -192,13 +198,38 @@ export function getActiveWorkout(userId: string, planId?: string) {
       setsByExercise.set(entry.exerciseId, sets);
     }
 
+    // Keyed by exerciseId so renaming an exercise keeps its history.
     const previousSets: Record<string, { weight: number | null; reps: number; durationSeconds: number | null }[]> = {};
     for (const exercise of exercises) {
       const sets = exercise.exerciseId ? setsByExercise.get(exercise.exerciseId) : undefined;
-      if (sets?.length) previousSets[exercise.name] = sets;
+      if (sets?.length && exercise.exerciseId) previousSets[exercise.exerciseId] = sets;
     }
 
     return { exercises, previousSets };
+  });
+}
+
+export async function getActiveSession(userId: string) {
+  return prisma.workoutLog.findFirst({
+    where: { userId, status: "in_progress" },
+    orderBy: { startedAt: "desc" },
+    select: {
+      id: true,
+      planId: true,
+      startedAt: true,
+      entries: {
+        select: {
+          id: true,
+          exerciseId: true,
+          exerciseName: true,
+          setNumber: true,
+          reps: true,
+          weight: true,
+          durationSeconds: true,
+        },
+        orderBy: [{ exerciseName: "asc" }, { setNumber: "asc" }],
+      },
+    },
   });
 }
 
