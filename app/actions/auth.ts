@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { passwordRuleError } from "@/lib/password";
-import { TOO_MANY_ATTEMPTS_MESSAGE, clientIp, limitSignIn, limitSignUp } from "@/lib/rate-limit";
+import { TOO_MANY_ATTEMPTS_MESSAGE, clientIp, limitSignUp, peekSignIn } from "@/lib/rate-limit";
 import { z } from "zod";
 import { emailSchema } from "@/lib/validation";
 
@@ -81,7 +81,7 @@ export async function signInAllowed(rawEmail: string) {
   const parsed = emailSchema.safeParse(typeof rawEmail === "string" ? rawEmail : "");
   if (!parsed.success) return { allowed: true as const };
   const ip = clientIp(await headers());
-  if ((await limitSignIn(parsed.data, ip)).limited) {
+  if ((await peekSignIn(parsed.data, ip)).limited) {
     return { allowed: false as const, error: TOO_MANY_ATTEMPTS_MESSAGE };
   }
   return { allowed: true as const };

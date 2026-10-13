@@ -74,6 +74,37 @@ function limiter(limit: number, windowMs: number) {
 
 export type LimitDecision = { limited: boolean };
 
+type Backend =
+  | { kind: "upstash"; limiter: Ratelimit }
+  | { kind: "memory" }
+  | { kind: "closed" };
+
+function resolveBackend(limit: number, windowMs: number): Backend {
+  const active = limiter(limit, windowMs);
+  if (active) return { kind: "upstash", limiter: active };
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_MEMORY_RATELIMIT !== "1") {
+    console.error("Upstash Redis missing; rate limit fail closed");
+    return { kind: "closed" };
+  }
+  if (process.env.NODE_ENV === "production") {
+    console.warn("Rate limit falling back to memory (ALLOW_MEMORY_RATELIMIT, tests only)");
+  }
+  return { kind: "memory" };
+}
+
+async function upstashRemaining(
+  active: Ratelimit,
+  key: string
+): Promise<number | null> {
+  try {
+    const { remaining } = await active.getRemaining(key);
+    return remaining;
+  } catch (error) {
+    console.error("Rate limit check failed:", error);
+    return null;
+  }
+}
+
 /**
  * Distributed rate-limit check. Uses Upstash when configured.
  * Missing Upstash vars: fail closed in production, in-memory fallback elsewhere.
@@ -109,11 +140,58 @@ export async function checkRateLimit(
   }
 }
 
-/** Sign-in: 5 attempts per 15 minutes, enforced per email AND per IP. */
-export async function limitSignIn(email: string, ip: string): Promise<LimitDecision> {
-  const byEmail = await checkRateLimit(`signin:email:${email}`, LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS);
-  if (byEmail.limited) return byEmail;
-  return checkRateLimit(`signin:ip:${ip}`, LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS);
+/**
+ * Read-only sign-in check: reports whether the email or IP is out of
+ * attempts WITHOUT consuming one. Used before verifying credentials.
+ */
+export async function peekSignIn(email: string, ip: string): Promise<LimitDecision> {
+  const emailKey = `signin:email:${email}`;
+  const ipKey = `signin:ip:${ip}`;
+  const backend = resolveBackend(LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS);
+  if (backend.kind === "closed") return { limited: true };
+  if (backend.kind === "upstash") {
+    const [emailRemaining, ipRemaining] = await Promise.all([
+      upstashRemaining(backend.limiter, emailKey),
+      upstashRemaining(backend.limiter, ipKey),
+    ]);
+    if (emailRemaining == null || ipRemaining == null) {
+      if (process.env.NODE_ENV === "production") return { limited: true };
+    } else {
+      return { limited: emailRemaining <= 0 || ipRemaining <= 0 };
+    }
+  }
+  return {
+    limited:
+      isRateLimited(emailKey, LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS) ||
+      isRateLimited(ipKey, LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS),
+  };
+}
+
+/**
+ * Record one FAILED sign-in against both the email and the IP key.
+ * Successful sign-ins never call this, so they use up no attempts.
+ */
+export async function consumeSignInFailure(email: string, ip: string): Promise<void> {
+  const emailKey = `signin:email:${email}`;
+  const ipKey = `signin:ip:${ip}`;
+  const backend = resolveBackend(LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS);
+  if (backend.kind === "closed") return;
+  if (backend.kind === "upstash") {
+    const results = await Promise.allSettled([
+      backend.limiter.limit(emailKey),
+      backend.limiter.limit(ipKey),
+    ]);
+    if (results.some((result) => result.status === "rejected")) {
+      console.error("Rate limit consume failed");
+      if (process.env.NODE_ENV !== "production" || process.env.ALLOW_MEMORY_RATELIMIT === "1") {
+        recordAttempt(emailKey, LOGIN_WINDOW_MS);
+        recordAttempt(ipKey, LOGIN_WINDOW_MS);
+      }
+    }
+    return;
+  }
+  recordAttempt(emailKey, LOGIN_WINDOW_MS);
+  recordAttempt(ipKey, LOGIN_WINDOW_MS);
 }
 
 /** Sign-up: 3 attempts per hour per IP. */

@@ -4,7 +4,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { sessionStillValid } from "@/lib/session-version";
-import { TOO_MANY_ATTEMPTS_MESSAGE, limitSignIn } from "@/lib/rate-limit";
+import { TOO_MANY_ATTEMPTS_MESSAGE, consumeSignInFailure, peekSignIn } from "@/lib/rate-limit";
 
 function ipFromAuthorizeReq(req: unknown) {
   const headers = (req as { headers?: Record<string, unknown> } | null)?.headers;
@@ -36,7 +36,7 @@ export const authOptions: NextAuthOptions = {
 
         const email = credentials.email.toLowerCase();
         const ip = ipFromAuthorizeReq(req);
-        if ((await limitSignIn(email, ip)).limited) {
+        if ((await peekSignIn(email, ip)).limited) {
           throw new Error(TOO_MANY_ATTEMPTS_MESSAGE);
         }
 
@@ -45,12 +45,14 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.passwordHash) {
+          await consumeSignInFailure(email, ip);
           throw new Error("No account found with this email address");
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
 
         if (!isValid) {
+          await consumeSignInFailure(email, ip);
           throw new Error("Invalid password");
         }
 
