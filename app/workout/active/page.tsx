@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getActiveSession, getActiveWorkout } from "@/lib/queries";
+import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import SubpageHeader from "@/components/SubpageHeader";
 import ActiveWorkoutLogger from "./ActiveWorkoutLogger";
@@ -17,7 +18,13 @@ export default async function ActiveWorkoutPage({ searchParams }: PageProps) {
 
   const { planId } = await searchParams;
   // Resume the in-progress session from the server, even on another device.
-  const activeSession = await getActiveSession(session.user.id);
+  const [activeSession, prefs] = await Promise.all([
+    getActiveSession(session.user.id),
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { restTimerEnabled: true },
+    }),
+  ]);
   const effectivePlanId = activeSession?.planId ?? planId;
   const workout = await getActiveWorkout(session.user.id, effectivePlanId ?? undefined);
 
@@ -44,6 +51,7 @@ export default async function ActiveWorkoutPage({ searchParams }: PageProps) {
           <ActiveWorkoutLogger
             userId={session.user.id}
             planId={effectivePlanId}
+            restPushEnabled={prefs?.restTimerEnabled ?? true}
             exercises={workout.exercises}
             previousSets={workout.previousSets}
             initialSession={

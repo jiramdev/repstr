@@ -61,6 +61,7 @@ interface InitialSession {
 interface ActiveWorkoutLoggerProps {
   userId: string;
   planId?: string | null;
+  restPushEnabled?: boolean;
   exercises: Exercise[];
   previousSets?: Record<string, PreviousSet[]>;
   initialSession?: InitialSession | null;
@@ -330,6 +331,7 @@ function setPayload(
 export default function ActiveWorkoutLogger({
   userId,
   planId,
+  restPushEnabled = true,
   exercises,
   previousSets = {},
   initialSession = null,
@@ -550,7 +552,7 @@ export default function ActiveWorkoutLogger({
   const scheduleServerPush = useCallback(
     (seconds: number, exerciseName: string) => {
       if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
-      if (!sessionId) return;
+      if (!sessionId || !restPushEnabled) return;
 
       const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidPublicKey) return;
@@ -590,7 +592,7 @@ export default function ActiveWorkoutLogger({
         })
         .catch((err) => console.error("Failed to schedule background push:", err));
     },
-    [cancelRestNotification, planId, sessionId, tokenKey]
+    [cancelRestNotification, planId, restPushEnabled, sessionId, tokenKey]
   );
 
   const clearTimer = useCallback(() => {
