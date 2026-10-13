@@ -106,6 +106,21 @@ describe("workout sessions", () => {
     );
   });
 
+  it("logSet never cancels the session's rest timers (no race with POST /api/rest-timer)", async () => {
+    workoutLogFindFirst.mockResolvedValue({ id: "session-a", planId: "plan-a" });
+    exerciseFindFirst.mockResolvedValue({ id: "ex-1", name: "Squat" });
+    logEntryCreate.mockResolvedValue({ id: "entry-1" });
+    const result = await logSet("session-a", {
+      exerciseName: "Squat",
+      setNumber: 1,
+      weight: 80,
+      reps: 5,
+      durationSeconds: null,
+    });
+    expect(result).toEqual({ success: true, entryId: "entry-1" });
+    expect(restTimerUpdateMany).not.toHaveBeenCalled();
+  });
+
   it("rejects invalid set input", async () => {
     workoutLogFindFirst.mockResolvedValue({ id: "session-a", planId: "plan-a" });
     const result = await logSet("session-a", {
