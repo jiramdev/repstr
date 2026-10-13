@@ -11,7 +11,24 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-`npm run build` runs `prisma generate` and `next build`. It does not apply database migrations.
+`npm run build` runs `prisma generate`, `prisma migrate deploy` and `next build`. Vercel runs the same build command, so migrations apply on every deploy. Never use `prisma db push` against production.
+
+## Backup before any migration
+
+```bash
+pg_dump "$DATABASE_URL" -Fc -f backup-$(date +%Y%m%d-%H%M).dump
+```
+
+Keep the dump until the deploy is verified. All schema changes are additive, nullable or defaulted, and never drop user data.
+
+## Regions
+
+Vercel functions run in `fra1` (see `vercel.json`), next to the users in the Netherlands. Move the Postgres database to an EU region too if it isn't already:
+
+1. Create a new EU (e.g. `eu-central-1` / Frankfurt) Postgres in the database provider.
+2. `pg_dump` the old database and restore into the new one.
+3. Update `DATABASE_URL` in Vercel env vars (production) and locally.
+4. Redeploy and verify, then decommission the old database.
 
 ## Environment
 
