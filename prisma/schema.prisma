@@ -17,6 +17,12 @@ model User {
   sex                 String?
   sessionVersion      Int      @default(0)
   lastMorningSentDate String?
+  reminderTime        String?
+  reminderTimezone    String?
+  reminderEnabled     Boolean  @default(true)
+  restTimerEnabled    Boolean  @default(true)
+  reminderQstashId    String?
+  reminderNextRunAt   DateTime?
   createdAt           DateTime @default(now())
 
   workoutPlans      WorkoutPlan[]
