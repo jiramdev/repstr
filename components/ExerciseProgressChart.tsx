@@ -12,7 +12,6 @@ interface Best {
   name: string;
   tracking: TrackingMode;
   topWeight: number;
-  e1rm: number;
   bestReps: number;
   bestHold: number;
 }
@@ -23,7 +22,7 @@ function formatScore(score: number, tracking: TrackingMode) {
 }
 
 function unitLabel(tracking: TrackingMode) {
-  if (tracking === "weight") return "e1RM";
+  if (tracking === "weight") return "kg";
   if (tracking === "reps") return "reps";
   return "sec";
 }
@@ -44,7 +43,7 @@ function Sparkline({ points }: { points: SeriesPoint[] }) {
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-20" role="img" aria-label="Voortgangsgrafiek">
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-20" role="img" aria-label="Progress chart">
       <polyline points={coords.join(" ")} fill="none" stroke="#baa3d0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       {coords.map((pair, idx) => {
         const [x, y] = pair.split(",");
@@ -61,7 +60,7 @@ export default function ExerciseProgressChart({
   series: Record<string, { tracking: TrackingMode; points: SeriesPoint[] }>;
   bests: Best[];
 }) {
-  const names = Object.keys(series).sort((a, b) => a.localeCompare(b, "nl"));
+  const names = Object.keys(series).sort((a, b) => a.localeCompare(b, "en"));
   const [selected, setSelected] = useState(names[0] ?? "");
   const current = selected ? series[selected] : undefined;
   const best = bests.find((row) => row.name === selected);
@@ -69,7 +68,7 @@ export default function ExerciseProgressChart({
   if (names.length === 0) {
     return (
       <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04]">
-        <span className="text-[14px] font-medium text-[#71717a]">Nog geen voortgang</span>
+        <span className="text-[14px] font-medium text-[#71717a]">No progress yet</span>
       </div>
     );
   }
@@ -77,7 +76,7 @@ export default function ExerciseProgressChart({
   return (
     <div className="space-y-2 pt-1">
       <select
-        aria-label="Oefening voor voortgangsgrafiek"
+        aria-label="Exercise for progress chart"
         value={selected}
         onChange={(e) => setSelected(e.target.value)}
         className="w-full bg-[#1b1b1e] border border-white/[0.04] rounded-2xl px-4 py-3 text-[14px] text-white outline-none focus:border-[#baa3d0]"
@@ -102,44 +101,27 @@ export default function ExerciseProgressChart({
           <Sparkline points={current.points.slice(-20)} />
           <p className="text-[11px] text-[#71717a]">
             {current.points[0]?.date} → {current.points.at(-1)?.date} · {current.points.length}{" "}
-            {current.points.length === 1 ? "sessie" : "sessies"}
+            {current.points.length === 1 ? "session" : "sessions"}
           </p>
         </div>
       )}
 
       {best && (
-        <div className="grid grid-cols-2 gap-2">
-          {best.tracking === "weight" ? (
-            <>
-              <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04] text-center">
-                <p className="text-[10px] font-semibold tracking-[0.18em] text-[#71717a] uppercase">Top</p>
-                <p className="font-editorial text-[22px] text-[#baa3d0] leading-none mt-1">
-                  {Number(best.topWeight.toFixed(1))}
-                  <span className="text-[11px] text-[#71717a] font-sans font-medium"> kg</span>
-                </p>
-              </div>
-              <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04] text-center">
-                <p className="text-[10px] font-semibold tracking-[0.18em] text-[#71717a] uppercase">e1RM</p>
-                <p className="font-editorial text-[22px] text-[#baa3d0] leading-none mt-1">
-                  {Number(best.e1rm.toFixed(1))}
-                  <span className="text-[11px] text-[#71717a] font-sans font-medium"> kg</span>
-                </p>
-              </div>
-            </>
-          ) : (
-            <div className="col-span-2 bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04] text-center">
-              <p className="text-[10px] font-semibold tracking-[0.18em] text-[#71717a] uppercase">
-                {best.tracking === "reps" ? "Beste reps" : "Beste hold"}
-              </p>
-              <p className="font-editorial text-[22px] text-[#baa3d0] leading-none mt-1">
-                {best.tracking === "reps" ? best.bestReps : best.bestHold}
-                <span className="text-[11px] text-[#71717a] font-sans font-medium">
-                  {" "}
-                  {best.tracking === "reps" ? "reps" : "sec"}
-                </span>
-              </p>
-            </div>
-          )}
+        <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04] text-center">
+          <p className="text-[10px] font-semibold tracking-[0.18em] text-[#71717a] uppercase">
+            {best.tracking === "weight" ? "Top weight" : best.tracking === "reps" ? "Best reps" : "Best hold"}
+          </p>
+          <p className="font-editorial text-[22px] text-[#baa3d0] leading-none mt-1">
+            {best.tracking === "weight"
+              ? Number(best.topWeight.toFixed(1))
+              : best.tracking === "reps"
+                ? best.bestReps
+                : best.bestHold}
+            <span className="text-[11px] text-[#71717a] font-sans font-medium">
+              {" "}
+              {best.tracking === "weight" ? "kg" : best.tracking === "reps" ? "reps" : "sec"}
+            </span>
+          </p>
         </div>
       )}
     </div>

@@ -56,7 +56,7 @@ describe("workout sessions", () => {
       reps: 5,
       durationSeconds: null,
     });
-    expect(result).toEqual({ error: "Sessie niet gevonden." });
+    expect(result).toEqual({ error: "Session not found." });
     expect(workoutLogFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ id: "session-b", userId: "user-a" }) })
     );
@@ -66,21 +66,21 @@ describe("workout sessions", () => {
   it("user A cannot delete user B's logged set", async () => {
     workoutLogFindFirst.mockResolvedValue(null);
     const result = await deleteLoggedSet("session-b", "entry-b");
-    expect(result).toEqual({ error: "Sessie niet gevonden." });
+    expect(result).toEqual({ error: "Session not found." });
     expect(logEntryDeleteMany).not.toHaveBeenCalled();
   });
 
   it("user A cannot finish user B's session", async () => {
     workoutLogFindFirst.mockResolvedValue(null);
     const result = await finishWorkoutSession("session-b");
-    expect(result).toEqual({ error: "Sessie niet gevonden." });
+    expect(result).toEqual({ error: "Session not found." });
     expect(workoutLogUpdate).not.toHaveBeenCalled();
   });
 
   it("user A cannot abandon user B's session", async () => {
     workoutLogFindFirst.mockResolvedValue(null);
     const result = await abandonWorkoutSession("session-b");
-    expect(result).toEqual({ error: "Sessie niet gevonden." });
+    expect(result).toEqual({ error: "Session not found." });
     expect(workoutLogUpdate).not.toHaveBeenCalled();
   });
 
@@ -114,7 +114,31 @@ describe("workout sessions", () => {
       weight: -5,
       reps: 5,
     });
-    expect(result).toEqual({ error: "Ongeldige set." });
+    expect(result).toEqual({ error: "Invalid set." });
     expect(logEntryCreate).not.toHaveBeenCalled();
+  });
+
+  it("abandoning marks the session abandoned (never counted)", async () => {
+    workoutLogFindFirst.mockResolvedValue({ id: "session-a", planId: "plan-a" });
+    const result = await abandonWorkoutSession("session-a");
+    expect(result).toEqual({ success: true });
+    expect(workoutLogUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "session-a" },
+        data: expect.objectContaining({ status: "abandoned" }),
+      })
+    );
+  });
+
+  it("finishing marks the session finished", async () => {
+    workoutLogFindFirst.mockResolvedValue({ id: "session-a", planId: "plan-a" });
+    const result = await finishWorkoutSession("session-a");
+    expect(result).toEqual({ success: true });
+    expect(workoutLogUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "session-a" },
+        data: expect.objectContaining({ status: "finished" }),
+      })
+    );
   });
 });

@@ -75,7 +75,7 @@ describe("plan ownership", () => {
   it("user A cannot edit an exercise in user B's plan", async () => {
     planExerciseFindFirst.mockResolvedValue(null);
     const result = await updateExercise("plan-b", "placement-b", "Squat", 3, 90);
-    expect(result).toEqual({ error: "Oefening niet gevonden." });
+    expect(result).toEqual({ error: "Exercise not found." });
     expect(planExerciseUpdate).not.toHaveBeenCalled();
   });
 
@@ -95,11 +95,11 @@ describe("plan ownership", () => {
 
   it("user A cannot schedule user B's plan", async () => {
     workoutPlanFindFirst.mockResolvedValue(null);
-    await expect(assignPlanToDay(1, "plan-b")).rejects.toThrow("Plan niet gevonden");
+    await expect(assignPlanToDay(1, "plan-b")).rejects.toThrow("Plan not found");
   });
 
   it("rejects an invalid day and an overlong plan name", async () => {
-    await expect(assignPlanToDay(7, null)).rejects.toThrow("Ongeldige dag");
+    await expect(assignPlanToDay(7, null)).rejects.toThrow("Invalid day");
     expect(await createWorkoutPlan("x".repeat(81))).toBeNull();
   });
 });

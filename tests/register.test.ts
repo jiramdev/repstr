@@ -40,7 +40,7 @@ describe("registerUser", () => {
 
   it("rejects a password shorter than 8 characters", async () => {
     const result = await registerUser(form("kort"));
-    expect(result).toEqual({ error: "Het wachtwoord moet minstens 8 tekens zijn." });
+    expect(result).toEqual({ error: "Password must be at least 8 characters." });
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -52,6 +52,6 @@ describe("registerUser", () => {
       })
     );
     const result = await registerUser(form("lang-wachtwoord"));
-    expect(result).toEqual({ error: "Dit e-mailadres is al in gebruik." });
+    expect(result).toEqual({ error: "This email address is already in use." });
   });
 });

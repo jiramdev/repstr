@@ -84,7 +84,7 @@ export default function NotificationSettings() {
         </button>
       </div>
       {unsupported && (
-        <p className="mt-3 text-[13px] text-[#a1a1aa]">This browser doesn't support notifications.</p>
+        <p className="mt-3 text-[13px] text-[#a1a1aa]">This browser does not support notifications.</p>
       )}
       {blocked && !on && (
         <p className="mt-3 text-[13px] text-[#a1a1aa]">Notifications are blocked in your browser.</p>

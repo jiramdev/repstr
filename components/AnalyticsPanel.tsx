@@ -1,14 +1,10 @@
 import dynamic from "next/dynamic";
 import { Trophy } from "lucide-react";
 import MonthCalendar from "@/components/MonthCalendar";
-import { exerciseProgress, type StrengthEntry, type TrackingMode } from "@/lib/strength";
+import type { StrengthEntry, TrackingMode } from "@/lib/strength";
 import {
   exerciseBests,
   exerciseSeries,
-  scheduleStreaks,
-  volumePerPlan,
-  volumePerWeek,
-  workoutsPerWeek,
   type HistoryWorkout,
 } from "@/lib/stats";
 import { formatAmsterdamDate } from "@/lib/amsterdam";
@@ -42,32 +38,19 @@ type Workout = {
 
 type WeightLog = { weight: number; loggedAt: string };
 
-function mondayLabel(week: string) {
-  return formatAmsterdamDate(`${week}T12:00:00Z`);
-}
-
 export default function AnalyticsPanel({
   workouts,
   weightLogs,
-  scheduledDays = [],
 }: {
   workouts: Workout[];
   weightLogs: WeightLog[];
-  scheduledDays?: number[];
 }) {
   const totalWorkouts = workouts.length;
   const workoutDates = workouts.map((workout) => dateKey(workout.completedAt));
   const todayKey = dateKey(new Date().toISOString());
-  const topPRs = exerciseProgress(workouts);
 
   const latestWeight = weightLogs.at(-1)?.weight;
 
-  const volumeWeeks = volumePerWeek(workouts);
-  const sessionsWeeks = workoutsPerWeek(workouts);
-  const sessionsByWeek = new Map(sessionsWeeks.map((row) => [row.week, row.sessions]));
-  const recentWeeks = volumeWeeks.slice(-8).reverse();
-  const planVolumes = volumePerPlan(workouts);
-  const streaks = scheduleStreaks(workoutDates, scheduledDays, todayKey);
   const series = exerciseSeries(workouts);
   const bests = exerciseBests(workouts);
   const history: HistoryWorkout[] = [...workouts]
@@ -92,7 +75,7 @@ export default function AnalyticsPanel({
           <div className="h-10 bg-[#141416] border border-white/[0.08] px-4 rounded-full flex items-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
             <span className="w-2 h-2 rounded-full bg-[#baa3d0]" />
             <span className="font-editorial text-[14px] tracking-wider text-white leading-none uppercase">
-              STATISTIEKEN
+              STATISTICS
             </span>
           </div>
         </header>
@@ -100,26 +83,26 @@ export default function AnalyticsPanel({
         <div className="grid grid-cols-2 gap-3.5">
           <div className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 text-center flex flex-col justify-between items-center aspect-square shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
             <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-              Gewicht
+              Weight
             </span>
             <div className="flex-1 flex items-center justify-center">
               <span className="text-[48px] font-editorial tracking-tight text-white leading-none block">
                 {latestWeight == null ? "--" : Number(latestWeight.toFixed(1))}
               </span>
             </div>
-            <span className="text-[12px] text-[#a1a1aa] font-medium">kilo</span>
+            <span className="text-[12px] text-[#a1a1aa] font-medium">kg</span>
           </div>
 
           <div className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 text-center flex flex-col justify-between items-center aspect-square shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
             <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-              Sessies
+              Workouts
             </span>
             <div className="flex-1 flex items-center justify-center">
               <span className="text-[48px] font-editorial tracking-tight text-white leading-none block">
                 {totalWorkouts}
               </span>
             </div>
-            <span className="text-[12px] text-[#a1a1aa] font-medium">voltooid</span>
+            <span className="text-[12px] text-[#a1a1aa] font-medium">completed</span>
           </div>
         </div>
 
@@ -128,102 +111,17 @@ export default function AnalyticsPanel({
         <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
           <div className="flex items-center justify-between px-1">
             <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-              Reeks tegen schema
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04] text-center">
-              <p className="text-[10px] font-semibold tracking-[0.18em] text-[#71717a] uppercase">Nu</p>
-              <p className="font-editorial text-[28px] text-[#baa3d0] leading-none mt-1">{streaks.current}</p>
-            </div>
-            <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04] text-center">
-              <p className="text-[10px] font-semibold tracking-[0.18em] text-[#71717a] uppercase">Langste</p>
-              <p className="font-editorial text-[28px] text-white leading-none mt-1">{streaks.longest}</p>
-            </div>
-          </div>
-          {scheduledDays.length === 0 && (
-            <p className="px-1 text-[12px] text-[#71717a]">Plan dagen in je schema voor een reeks.</p>
-          )}
-        </section>
-
-        <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-              Volume per week
-            </span>
-          </div>
-          {recentWeeks.length === 0 ? (
-            <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04]">
-              <span className="text-[14px] font-medium text-[#71717a]">Nog geen volume</span>
-            </div>
-          ) : (
-            <div className="space-y-2 pt-1">
-              {recentWeeks.map((row) => (
-                <div
-                  key={row.week}
-                  className="bg-[#1b1b1e] rounded-2xl px-4 py-3 flex items-center justify-between gap-3 border border-white/[0.04]"
-                >
-                  <span className="text-[14px] font-medium text-white">w/o {mondayLabel(row.week)}</span>
-                  <div className="flex items-baseline gap-1.5 shrink-0">
-                    <span className="font-editorial text-[22px] text-[#baa3d0] tracking-wider leading-none">
-                      {row.volume}
-                    </span>
-                    <span className="text-[11px] text-[#71717a] font-medium">kg</span>
-                    <span className="text-[11px] text-white font-semibold">
-                      · {sessionsByWeek.get(row.week) ?? 0}x
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-              Volume per plan
-            </span>
-          </div>
-          {planVolumes.length === 0 ? (
-            <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04]">
-              <span className="text-[14px] font-medium text-[#71717a]">Nog geen volume</span>
-            </div>
-          ) : (
-            <div className="space-y-2 pt-1">
-              {planVolumes.map((row) => (
-                <div
-                  key={row.name}
-                  className="bg-[#1b1b1e] rounded-2xl px-4 py-3 flex items-center justify-between gap-3 border border-white/[0.04]"
-                >
-                  <span className="text-[14px] font-medium text-white truncate">{row.name}</span>
-                  <div className="flex items-baseline gap-1.5 shrink-0">
-                    <span className="font-editorial text-[22px] text-[#baa3d0] tracking-wider leading-none">
-                      {row.volume}
-                    </span>
-                    <span className="text-[11px] text-[#71717a] font-medium">kg</span>
-                    <span className="text-[11px] text-white font-semibold">· {row.sessions}x</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
               PRs
             </span>
             <Trophy className="w-3.5 h-3.5 text-[#baa3d0]" />
           </div>
-          {topPRs.length === 0 ? (
+          {bests.length === 0 ? (
             <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04]">
-              <span className="text-[14px] font-medium text-[#71717a]">Nog geen PRs</span>
+              <span className="text-[14px] font-medium text-[#71717a]">No PRs yet</span>
             </div>
           ) : (
             <div className="space-y-2 pt-1">
-              {topPRs.map((pr) => (
+              {bests.map((pr) => (
                 <div
                   key={pr.name}
                   className="bg-[#1b1b1e] rounded-2xl px-4 py-3 flex items-center justify-between gap-3 border border-white/[0.04]"
@@ -231,17 +129,15 @@ export default function AnalyticsPanel({
                   <span className="text-[14px] font-medium text-white truncate">{pr.name}</span>
                   <div className="flex items-baseline gap-1.5 shrink-0">
                     <span className="font-editorial text-[22px] text-[#baa3d0] tracking-wider leading-none">
-                      {pr.unit === "kg" ? Number(pr.best.toFixed(1)) : Math.round(pr.best)}
+                      {pr.tracking === "weight"
+                        ? Number(pr.topWeight.toFixed(1))
+                        : pr.tracking === "reps"
+                          ? pr.bestReps
+                          : pr.bestHold}
                     </span>
                     <span className="text-[11px] text-[#71717a] font-medium">
-                      {pr.unit === "kg" ? "e1RM" : pr.unit === "reps" ? "reps" : "sec"}
+                      {pr.tracking === "weight" ? "kg" : pr.tracking === "reps" ? "reps" : "sec"}
                     </span>
-                    {pr.changePct != null && (
-                      <span className="text-[11px] text-white font-semibold">
-                        {pr.changePct > 0 ? "+" : ""}
-                        {Math.round(pr.changePct)}%
-                      </span>
-                    )}
                   </div>
                 </div>
               ))}
@@ -252,7 +148,7 @@ export default function AnalyticsPanel({
         <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
           <div className="flex items-center justify-between px-1">
             <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-              Voortgang per oefening
+              Progress per exercise
             </span>
           </div>
           <ExerciseProgressChart series={series} bests={bests} />
@@ -261,12 +157,12 @@ export default function AnalyticsPanel({
         <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
           <div className="flex items-center justify-between px-1">
             <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-              Geschiedenis
+              History
             </span>
           </div>
           {history.length === 0 ? (
             <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04]">
-              <span className="text-[14px] font-medium text-[#71717a]">Nog geen workouts</span>
+              <span className="text-[14px] font-medium text-[#71717a]">No workouts yet</span>
             </div>
           ) : (
             <div className="space-y-2 pt-1">

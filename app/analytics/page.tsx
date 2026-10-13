@@ -13,7 +13,6 @@ export default async function AnalyticsPage() {
     <AnalyticsPanel
       workouts={analytics.workouts}
       weightLogs={analytics.weightLogs}
-      scheduledDays={analytics.scheduledDays}
     />
   );
 }

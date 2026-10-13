@@ -8,6 +8,11 @@ export function userCacheTag(userId: string) {
   return `user:${userId}`;
 }
 
+/** Only finished sessions ever count. Abandoned or cancelled workouts stay out. */
+export function finishedSessionCountWhere(userId: string, startOfMonth: Date) {
+  return { userId, status: "finished", completedAt: { gte: startOfMonth } };
+}
+
 export function refreshUserCache(userId: string) {
   const tag = userCacheTag(userId);
   // updateTag covers "use cache" entries; revalidateTag covers unstable_cache.
@@ -51,7 +56,7 @@ export function getDashboard(userId: string) {
         select: { weight: true },
       }),
       prisma.workoutLog.count({
-        where: { userId, completedAt: { gte: startOfMonth } },
+        where: finishedSessionCountWhere(userId, startOfMonth),
       }),
       prisma.user.findUnique({
         where: { id: userId },
@@ -165,6 +170,7 @@ export async function getActiveWorkout(userId: string, planId?: string) {
               INNER JOIN "WorkoutLog" wl ON wl."id" = le."workoutLogId"
               WHERE le."exerciseId" IN (${Prisma.join(exerciseIds)})
                 AND wl."userId" = ${userId}
+                AND wl."status" = 'finished'
                 AND wl."completedAt" IS NOT NULL
               ORDER BY le."exerciseId", wl."completedAt" DESC
             `
@@ -239,7 +245,7 @@ export async function getActiveSession(userId: string) {
 
 export function getAnalytics(userId: string) {
   return cached(userId, "analytics", async () => {
-    const [workouts, weightLogs, scheduledDays] = await Promise.all([
+    const [workouts, weightLogs] = await Promise.all([
       prisma.workoutLog.findMany({
         where: { userId, status: "finished", completedAt: { not: null } },
         select: {
@@ -266,10 +272,6 @@ export function getAnalytics(userId: string) {
         orderBy: { loggedAt: "asc" },
         select: { weight: true, loggedAt: true },
       }),
-      prisma.scheduleDay.findMany({
-        where: { schedule: { userId }, planId: { not: null } },
-        select: { dayOfWeek: true },
-      }),
     ]);
 
     return {
@@ -291,7 +293,6 @@ export function getAnalytics(userId: string) {
         weight: log.weight,
         loggedAt: log.loggedAt.toISOString(),
       })),
-      scheduledDays: scheduledDays.map((day) => day.dayOfWeek),
     };
   });
 }

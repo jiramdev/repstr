@@ -3,9 +3,9 @@ import { passwordRuleError } from "@/lib/password";
 
 describe("password rule", () => {
   it("rejects passwords shorter than 8 characters", () => {
-    expect(passwordRuleError("kort")).toBe("Het wachtwoord moet minstens 8 tekens zijn.");
-    expect(passwordRuleError("1234567", "Het nieuwe wachtwoord")).toBe(
-      "Het nieuwe wachtwoord moet minstens 8 tekens zijn."
+    expect(passwordRuleError("kort")).toBe("Password must be at least 8 characters.");
+    expect(passwordRuleError("1234567", "The new password")).toBe(
+      "The new password must be at least 8 characters."
     );
   });
 
