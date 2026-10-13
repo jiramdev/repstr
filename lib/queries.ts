@@ -245,34 +245,34 @@ export async function getActiveSession(userId: string) {
 
 export function getAnalytics(userId: string) {
   return cached(userId, "analytics", async () => {
-    const [workouts, weightLogs] = await Promise.all([
-      prisma.workoutLog.findMany({
-        where: { userId, status: "finished", completedAt: { not: null } },
-        select: {
-          id: true,
-          planId: true,
-          plan: { select: { name: true } },
-          completedAt: true,
-          entries: {
-            select: {
-              exerciseName: true,
-              setNumber: true,
-              weight: true,
-              reps: true,
-              durationSeconds: true,
-              exercise: { select: { name: true, tracking: true } },
-            },
-            orderBy: [{ exerciseName: "asc" }, { setNumber: "asc" }],
+    // Sequential on purpose: serverless pools are tiny (connection_limit=1),
+    // so parallel queries would each hold a connection and starve the pool.
+    const workouts = await prisma.workoutLog.findMany({
+      where: { userId, status: "finished", completedAt: { not: null } },
+      select: {
+        id: true,
+        planId: true,
+        plan: { select: { name: true } },
+        completedAt: true,
+        entries: {
+          select: {
+            exerciseName: true,
+            setNumber: true,
+            weight: true,
+            reps: true,
+            durationSeconds: true,
+            exercise: { select: { name: true, tracking: true } },
           },
+          orderBy: [{ exerciseName: "asc" }, { setNumber: "asc" }],
         },
-        orderBy: { completedAt: "asc" },
-      }),
-      prisma.bodyWeightLog.findMany({
-        where: { userId },
-        orderBy: { loggedAt: "asc" },
-        select: { weight: true, loggedAt: true },
-      }),
-    ]);
+      },
+      orderBy: { completedAt: "asc" },
+    });
+    const weightLogs = await prisma.bodyWeightLog.findMany({
+      where: { userId },
+      orderBy: { loggedAt: "asc" },
+      select: { weight: true, loggedAt: true },
+    });
 
     return {
       workouts: workouts.map((workout) => ({

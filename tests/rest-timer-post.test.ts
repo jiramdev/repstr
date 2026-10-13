@@ -44,7 +44,7 @@ vi.mock("@/lib/prisma", () => ({
 import { POST } from "@/app/api/rest-timer/route";
 
 const SUBSCRIPTION = {
-  endpoint: "https://push.example/device-1",
+  endpoint: "https://fcm.googleapis.com/fcm/send/test-device-1",
   keys: { p256dh: "p256dh-key", auth: "auth-key" },
 };
 

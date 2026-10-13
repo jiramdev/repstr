@@ -8,13 +8,14 @@ import { refreshUserCache } from "@/lib/queries";
 import { z } from "zod";
 import webpush from "web-push";
 import { cancelReminderSchedule, scheduleNextReminder } from "@/lib/reminders";
+import { isAllowedPushEndpoint } from "@/lib/push";
 import {
   normalizeReminderTime,
   normalizeTimezone,
 } from "@/lib/reminder-time";
 
 const subscriptionSchema = z.object({
-  endpoint: z.string().url().max(2000),
+  endpoint: z.string().url().max(2000).refine(isAllowedPushEndpoint, "Push service not allowed"),
   p256dh: z.string().min(1).max(500),
   auth: z.string().min(1).max(500),
 });

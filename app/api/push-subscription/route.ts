@@ -4,12 +4,12 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { upsertPushSubscription } from "@/lib/push";
+import { upsertPushSubscription, isAllowedPushEndpoint } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
 
 const subscriptionSchema = z.object({
-  endpoint: z.string().url().max(2000),
+  endpoint: z.string().url().max(2000).refine(isAllowedPushEndpoint, "Push service not allowed"),
   keys: z.object({
     p256dh: z.string().min(1).max(500),
     auth: z.string().min(1).max(500),

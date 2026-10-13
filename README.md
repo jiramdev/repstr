@@ -51,14 +51,14 @@ Keep the dump until the deploy is verified. All schema changes are additive, nul
 
 ## Regions and connection pooling
 
-Vercel functions run in `fra1` (see `vercel.json`), next to the users in the Netherlands. Move the Postgres database to an EU region too if it isn't already:
+Vercel functions run in `fra1` (see `vercel.json`), next to the users in the Netherlands. That top-level `regions` setting is the only region pin available: per-route `preferredRegion` is deprecated in Next 16, and the edge middleware (`proxy.ts`, auth redirect only, no database) is global by nature. Move the Postgres database to an EU region too if it isn't already:
 
 1. Create a new EU (e.g. `eu-central-1` / Frankfurt) Postgres in the database provider.
 2. `pg_dump` the old database and restore into the new one.
 3. Update `DATABASE_URL` in Vercel env vars (production) and locally.
 4. Redeploy and verify, then decommission the old database.
 
-Use a single Prisma client instance (`lib/prisma.ts`, module-level singleton reused by warm serverless functions). For serverless, point `DATABASE_URL` at a pooled connection string (PgBouncer, e.g. Supabase/Neon pooler) with a low connection limit (`connection_limit=1&pgbouncer=true`); use the direct URL only for migrations.
+Use a single Prisma client instance (`lib/prisma.ts`, module-level singleton reused by warm serverless functions). For serverless, point `DATABASE_URL` at a pooled connection string (PgBouncer, e.g. Supabase/Neon pooler) with a low connection limit (`connection_limit=1&pgbouncer=true`); use the direct URL only for migrations. Example shape: `postgresql://user:pass@<pooler-host>:6543/db?pgbouncer=true&connection_limit=1`. The analytics queries run sequentially on purpose so a tiny pool is never held by several queries at once.
 
 ## Migrations on the existing production database
 

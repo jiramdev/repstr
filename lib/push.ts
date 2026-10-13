@@ -6,6 +6,40 @@ export interface StoredSubscription {
   auth: string;
 }
 
+const PUSH_HOST_ALLOWLIST: { exact?: string; suffix?: string }[] = [
+  { exact: "fcm.googleapis.com" },
+  { suffix: ".googleapis.com" },
+  { suffix: ".push.apple.com" },
+  { exact: "updates.push.services.mozilla.com" },
+  { suffix: ".notify.windows.com" },
+];
+
+/**
+ * Only known push service hosts may receive server-side requests.
+ * Prevents using the subscription endpoint as an SSRF vector.
+ */
+export function isAllowedPushEndpoint(raw: string) {
+  let host: string;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") return false;
+    host = url.hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (
+    process.env.ALLOW_MEMORY_RATELIMIT === "1" &&
+    (host === "localhost" || host === "127.0.0.1")
+  ) {
+    return true;
+  }
+  return PUSH_HOST_ALLOWLIST.some((rule) => {
+    if (rule.exact) return host === rule.exact;
+    if (rule.suffix) return host.endsWith(rule.suffix);
+    return false;
+  });
+}
+
 /**
  * Store a push subscription without ever moving an endpoint to another user:
  * same user updates keys, a different user deletes the old row and creates
