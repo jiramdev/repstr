@@ -9,10 +9,16 @@ const e2eEnv: Record<string, string> = {
   QSTASH_TOKEN: "e2e-qstash-token",
   QSTASH_CURRENT_SIGNING_KEY: "e2e-current-key",
   QSTASH_NEXT_SIGNING_KEY: "e2e-next-key",
-  NEXT_PUBLIC_VAPID_PUBLIC_KEY: "e2e-vapid-key",
-  VAPID_PRIVATE_KEY: "e2e-vapid-private",
+  // Static test-only VAPID pair for localhost e2e push delivery. Useless
+  // outside this loopback setup (real subscriptions are never committed).
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: "BIJic5Z108nEvBfH5D9yohVTmdSot6AqkYDcTtEXb4UGvU7U9BNl9ZHPePIZFbSTFR2Wt0cqXK_BB_g7mIAJSbQ",
+  VAPID_PRIVATE_KEY: "7WzuY156dUk14zgmJRTl7KXDXO5gF6eNr2uCNfPmPkg",
   VAPID_SUBJECT: "mailto:e2e@example.com",
   ALLOW_MEMORY_RATELIMIT: "1",
+  NODE_TLS_REJECT_UNAUTHORIZED: "0",
+  QSTASH_URL: "http://localhost:3210",
+  QSTASH_STUB_PORT: "3210",
+  QSTASH_STUB_SIGNING_KEY: "e2e-current-key",
 };
 
 export default defineConfig({
@@ -22,6 +28,7 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3100",
     trace: "retain-on-failure",
+    permissions: ["notifications"],
   },
   webServer: {
     command: "npm run start -- --port 3100",
@@ -29,5 +36,10 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     env: e2eEnv,
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], channel: "chromium" },
+    },
+  ],
 });

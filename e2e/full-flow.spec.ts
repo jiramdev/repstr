@@ -1,7 +1,55 @@
 import { expect, test, type Page } from "@playwright/test";
+import { spawn, type ChildProcess } from "node:child_process";
+import { createECDH, randomBytes } from "node:crypto";
+import path from "node:path";
 
 const email = `e2e-${Date.now()}@example.com`;
 const password = "e2e-password-long";
+
+let stub: ChildProcess | null = null;
+
+test.beforeAll(async () => {
+  stub = spawn(process.execPath, [path.join(__dirname, "qstash-stub.mjs")], {
+    env: {
+      ...process.env,
+      QSTASH_STUB_PORT: "3210",
+      QSTASH_STUB_SIGNING_KEY: "e2e-current-key",
+    },
+    stdio: "ignore",
+  });
+  for (let i = 0; i < 50; i++) {
+    try {
+      const res = await fetch("http://localhost:3210/v2/messages/nope", { method: "DELETE" });
+      if (res.ok || res.status === 404) break;
+    } catch {
+      // Not up yet.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+});
+
+test.afterAll(async () => {
+  stub?.kill();
+  stub = null;
+});
+
+async function restTimerStatus(page: Page): Promise<string | null> {
+  const res = await page.context().request.get("/api/debug/rest-timers");
+  if (!res.ok()) return null;
+  const body = await res.json();
+  return (body.timers[0]?.status as string | undefined) ?? null;
+}
+
+function fakePushSubscription() {
+  const ecdh = createECDH("prime256v1");
+  ecdh.generateKeys();
+  const toUrl = (buf: Buffer) =>
+    buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return {
+    endpoint: "https://localhost:3220/fake-push/e2e",
+    keys: { p256dh: toUrl(ecdh.getPublicKey()), auth: toUrl(randomBytes(16)) },
+  };
+}
 
 /** Open an add-exercise form idempotently (a re-render mid-click can double-toggle it). */
 async function openAddForm(page: Page) {
@@ -70,6 +118,16 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("E2E Bench")).toBeVisible();
 
+  // 3d. A hold exercise with a short goal for the hold timer check.
+  await page.getByRole("button", { name: "Add exercise" }).click();
+  await page.getByPlaceholder("E.g. Squat").fill("E2E Plank");
+  await page.getByRole("button", { name: "Hold", exact: true }).click();
+  await page.getByLabel("Default sets", { exact: true }).fill("1");
+  await page.getByLabel("Target (seconds)", { exact: true }).fill("2");
+  await page.getByLabel("Rest", { exact: true }).fill("5");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("E2E Plank")).toBeVisible();
+
   // 4. Schedule: create a plan and assign it to Monday.
   await page.goto("/schedule");
   await page.getByRole("button", { name: "New plan" }).click();
@@ -100,10 +158,16 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   await page.getByRole("button", { name: /E2E Bench/ }).first().click();
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByText("E2E Bench")).toBeVisible();
+  // Fourth placement: the hold exercise.
+  await openAddForm(page);
+  await page.getByPlaceholder("Search or create an exercise").fill("E2E Plank");
+  await page.getByRole("button", { name: /E2E Plank/ }).first().click();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByText("E2E Plank")).toBeVisible();
 
   // Reorder by dragging Bench to the top; the order persists after reload.
   const grips = page.getByRole("button", { name: "Drag to reorder" });
-  await expect(grips).toHaveCount(3);
+  await expect(grips).toHaveCount(4);
   await page.evaluate(() => document.fonts.ready);
   const rows = page.locator("[data-exercise-id]");
   await rows.nth(2).scrollIntoViewIfNeeded();
@@ -139,14 +203,28 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
 
   // 6. Workout, one exercise at a time (Bench was dragged to the top).
   await page.goto(`/workout/active?planId=${planId}`);
-  await expect(page.getByText("Exercise 1 of 3")).toBeVisible();
+  await expect(page.getByText("Exercise 1 of 4")).toBeVisible();
+  // Headless browsers cannot reach FCM: inject a fabricated subscription so
+  // the real client scheduling path runs against the local push stub.
+  await page.evaluate((sub) => {
+    (window as unknown as { __repiqTestPushSubscription?: unknown }).__repiqTestPushSubscription = {
+      endpoint: sub.endpoint,
+      toJSON: () => sub,
+    };
+  }, fakePushSubscription());
   await page.getByLabel("Set 1 weight in kilos").fill("60");
   await page.getByLabel("Set 1 reps").fill("8");
   await page.getByRole("button", { name: "Check off set 1" }).click();
-  await page.getByRole("button", { name: "Skip rest" }).click();
+  // Rest push stays pending until it fires, then marks sent.
+  await expect
+    .poll(async () => restTimerStatus(page), { timeout: 10000 })
+    .toBe("pending");
+  await expect
+    .poll(async () => restTimerStatus(page), { timeout: 30000 })
+    .toBe("sent");
   // Next exercise: bodyweight has no weight field, reps only.
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByText("Exercise 2 of 3")).toBeVisible();
+  await expect(page.getByText("Exercise 2 of 4")).toBeVisible();
   await expect(page.getByLabel(/weight in kilos/)).toHaveCount(0);
   await page.getByLabel("Set 1 reps").fill("10");
   await page.getByRole("button", { name: "Check off set 1" }).click();
@@ -158,24 +236,34 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   await page.getByRole("button", { name: "Check off set 2" }).click();
   await page.getByRole("button", { name: "Skip rest" }).click();
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByText("Exercise 3 of 3")).toBeVisible();
+  await expect(page.getByText("Exercise 3 of 4")).toBeVisible();
   await page.getByLabel("Set 1 reps").fill("8");
   await page.getByRole("button", { name: "Check off set 1" }).click();
   await page.getByRole("button", { name: "Skip rest" }).click();
   await page.getByLabel("Set 2 reps").fill("9");
   await page.getByRole("button", { name: "Check off set 2" }).click();
   await page.getByRole("button", { name: "Skip rest" }).click();
+  // Fourth exercise: hold timer with a 2-second goal.
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByText("Exercise 4 of 4")).toBeVisible();
+  await page.getByRole("button", { name: "Start hold" }).click();
+  await expect(page.getByText("GET READY")).toBeVisible();
+  await expect(page.getByRole("button", { name: "SAVE" })).toBeVisible({ timeout: 25000 });
+  await page.getByRole("button", { name: "One second less" }).click();
+  await page.getByRole("button", { name: "SAVE" }).click();
+  await expect(page.getByRole("button", { name: "Set 1 checked off" })).toBeVisible();
+  await page.getByRole("button", { name: "Skip rest" }).click();
   await page.getByRole("button", { name: "FINISH WORKOUT" }).click();
   // Summary screen of the finished workout.
   await expect(page).toHaveURL(/\/workout\/summary\/.+/);
   await expect(page.getByText("E2E Plan").first()).toBeVisible();
-  await expect(page.getByText("5 sets · 480 kg")).toBeVisible();
+  await expect(page.getByText("6 sets · 480 kg")).toBeVisible();
   await page.getByRole("link", { name: "DONE" }).click();
   await expect(page).toHaveURL("/");
 
   // 7. Second workout: placeholders from last time + "same as last time".
   await page.goto(`/workout/active?planId=${planId}`);
-  await expect(page.getByText("Exercise 1 of 3")).toBeVisible();
+  await expect(page.getByText("Exercise 1 of 4")).toBeVisible();
   // Bench history: set 1 was logged as 60 kg x 8.
   expect(await page.getByLabel("Set 1 reps").getAttribute("placeholder")).toBe("8");
   await expect(
@@ -185,7 +273,8 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   // Finish only shows on the final exercise.
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByText("Exercise 3 of 3")).toBeVisible();
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByText("Exercise 4 of 4")).toBeVisible();
   await page.getByRole("button", { name: "FINISH WORKOUT" }).click();
   await expect(page).toHaveURL(/\/workout\/summary\/.+/);
   await expect(page.getByText("No sets logged")).toBeVisible();
@@ -198,9 +287,10 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   await expect(page.getByText("E2E Push-up").first()).toBeVisible();
   await expect(page.getByText("E2E Plan").first()).toBeVisible();
   await expect(page.getByText("History")).toBeVisible();
-  // Logging 60 kg gives a PR of 60 kg.
+  // Logging 60 kg gives a PR of 60 kg, and the hold shows its seconds.
   await expect(page.getByText("E2E Bench").first()).toBeVisible();
   await expect(page.getByText("60", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("E2E Plank").first()).toBeVisible();
   // Every history workout links straight to the same summary screen.
   await page.getByRole("link", { name: /E2E Plan/ }).first().click();
   await expect(page).toHaveURL(/\/workout\/summary\/.+/);

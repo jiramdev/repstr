@@ -6,7 +6,9 @@ import { Check, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { motion } from "motion/react";
 import { popTransition } from "@/lib/motion";
 import { secondsRemaining as remainingSeconds } from "@/lib/notifications";
+import { holdPersonalBest } from "@/lib/hold-timer";
 import { placeholderSet } from "@/lib/strength";
+import HoldOverlay, { HoldStartButton } from "@/components/HoldOverlay";
 import {
   abandonWorkoutSession,
   deleteLoggedSet,
@@ -578,7 +580,15 @@ export default function ActiveWorkoutLogger({
     (seconds: number, exerciseName: string) => {
       if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
       if (!sessionId || !restPushEnabled) return;
-      const sub = pushSubscription.current;
+      // E2E-only hook: headless browsers cannot reach FCM, so tests inject a
+      // fabricated (but validly shaped) subscription. Never set in production.
+      const testSub = (window as unknown as { __repiqTestPushSubscription?: unknown })
+        .__repiqTestPushSubscription;
+      const sub =
+        pushSubscription.current ??
+        (testSub && typeof testSub === "object"
+          ? (testSub as Pick<PushSubscription, "endpoint" | "toJSON"> as unknown as PushSubscription)
+          : null);
       if (!sub) return;
 
       // The server atomically replaces this session's older pending timer,
@@ -697,6 +707,48 @@ export default function ActiveWorkoutLogger({
     [rowsByExercise, persistRows]
   );
 
+  // Save a hold-timer result exactly like a manual entry: fill the first
+  // incomplete row (or append one), check it, save it, start the rest timer.
+  const handleHoldSave = useCallback(
+    (exercise: Exercise, seconds: number) => {
+      const rows = rowsByExercise[exercise.id] ?? [];
+      if (!sessionId) return;
+      const restDuration = exercise.restSeconds || 90;
+      let idx = rows.findIndex((row) => !row.isCompleted);
+      let nextRows = rows;
+      if (idx === -1) {
+        const nextNumber = rows.reduce((max, row) => Math.max(max, row.setNumber), 0) + 1;
+        nextRows = [
+          ...rows,
+          { key: clientKey(), entryId: null, setNumber: nextNumber, weight: "", reps: "", duration: "", isCompleted: false, pending: false },
+        ];
+        idx = nextRows.length - 1;
+      }
+      const current = nextRows[idx];
+      const completedRow = {
+        ...current,
+        duration: String(seconds),
+        isCompleted: true,
+        pending: true,
+      };
+      const merged = nextRows.map((row, i) => (i === idx ? completedRow : row));
+      persistRows({ ...rowsByExercise, [exercise.id]: merged });
+      const previous = (exercise.exerciseId ? previousSets[exercise.exerciseId] : undefined)?.[
+        completedRow.setNumber - 1
+      ];
+      const payload = setPayload(
+        exercise,
+        { ...completedRow, duration: String(seconds) },
+        previous
+      );
+      enqueueOp({ kind: "create", clientKey: completedRow.key, sessionId, set: payload })
+        .then(() => drainOutbox(sessionId))
+        .catch((err) => console.error("Failed to save set:", err));
+      startRestTimer(restDuration, exercise.name);
+    },
+    [rowsByExercise, persistRows, sessionId, previousSets, drainOutbox, startRestTimer]
+  );
+
   const handleSameAsLast = useCallback(
     (exercise: Exercise) => {
       const last = exercise.exerciseId ? previousSets[exercise.exerciseId]?.at(-1) : undefined;
@@ -811,6 +863,7 @@ export default function ActiveWorkoutLogger({
           onUpdate={(idx, field, value) => handleUpdate(exercise.id, idx, field, value)}
           onToggle={(idx) => handleToggleSet(exercise, idx)}
           onAddSet={() => handleAddSet(exercise)}
+          onHoldSave={(seconds) => handleHoldSave(exercise, seconds)}
           onSameAsLast={() => handleSameAsLast(exercise)}
         />
       )}
@@ -874,6 +927,7 @@ const ExerciseStep = memo(function ExerciseStep({
   onToggle,
   onAddSet,
   onSameAsLast,
+  onHoldSave,
 }: {
   exercise: Exercise;
   rows: SetRow[];
@@ -882,12 +936,15 @@ const ExerciseStep = memo(function ExerciseStep({
   onToggle: (setIndex: number) => void;
   onAddSet: () => void;
   onSameAsLast: () => void;
+  onHoldSave: (seconds: number) => void;
 }) {
   const restDuration = exercise.restSeconds || 90;
   const tracking = exercise.tracking ?? "weight";
   const columns =
     tracking === "weight" ? "grid-cols-[28px_1fr_1fr_36px]" : "grid-cols-[28px_1fr_36px]";
   const lastPrevious = previousSets?.at(-1);
+  const [holdOpen, setHoldOpen] = useState(false);
+  const personalBest = holdPersonalBest(previousSets);
 
   return (
     <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
@@ -923,7 +980,7 @@ const ExerciseStep = memo(function ExerciseStep({
         <span>#</span>
         {tracking === "weight" && <span>KG</span>}
         <span>{tracking === "hold" ? "SEC" : "REPS"}</span>
-        <span className="sr-only">Afgevinkt</span>
+        <span className="sr-only">Check off</span>
       </div>
 
       <div className="space-y-2">
@@ -981,6 +1038,11 @@ const ExerciseStep = memo(function ExerciseStep({
                 }
                 className="w-full bg-[#121214] border border-white/[0.06] rounded-xl py-2 text-center font-mono text-[15px] font-medium text-white outline-none placeholder:text-[#71717a] focus:border-[#baa3d0] disabled:opacity-40"
               />
+              {tracking === "hold" && !isDone && (
+                <div className="col-span-full -mt-1 mb-1">
+                  <HoldStartButton onStart={() => setHoldOpen(true)} />
+                </div>
+              )}
 
               <button
                 type="button"
@@ -1010,6 +1072,18 @@ const ExerciseStep = memo(function ExerciseStep({
           <span className="text-[12px] font-semibold tracking-[0.14em] uppercase">Add set</span>
         </button>
       </div>
+      {holdOpen && (
+        <HoldOverlay
+          exerciseName={exercise.name}
+          goalSeconds={exercise.repGoal ?? null}
+          personalBest={personalBest}
+          onSave={(seconds) => {
+            setHoldOpen(false);
+            onHoldSave(seconds);
+          }}
+          onDiscard={() => setHoldOpen(false)}
+        />
+      )}
     </section>
   );
 });
