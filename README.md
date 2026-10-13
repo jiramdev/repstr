@@ -62,6 +62,8 @@ npx prisma migrate deploy
 
 `migrate resolve` records the baseline as already applied and does not execute it. `migrate deploy` then runs only the review migration. That migration adds `User.sessionVersion`, replaces `User.restMessageId` with a `RestTimer` row per device, adds the listed indexes, and deletes duplicate plan placements and notifications before creating the unique indexes.
 
+Later migrations (e.g. `20261013120000_workout_sessions`) apply with `npx prisma migrate deploy` only. That migration is additive and backfills safely: exercise library defaults, per-plan values copied into `PlanExercise` overrides, per-plan order renumbered before the unique order constraint, `LogEntry.weight` nulled for non-weight exercises, and `WorkoutLog.status` / `RestTimer.status` defaulted.
+
 A brand-new database can skip `migrate resolve` and run `npx prisma migrate deploy` only.
 
-Vercel does not run either command during the build.
+Vercel runs `prisma migrate deploy` during the build (`npm run build`).

@@ -24,7 +24,7 @@ interface Exercise {
 }
 
 interface PreviousSet {
-  weight: number;
+  weight: number | null;
   reps: number;
   durationSeconds?: number | null;
 }
@@ -320,7 +320,7 @@ const ExerciseSection = memo(function ExerciseSection({
   );
 });
 
-function loggedNumber(typed: string, previous: number | undefined, asInteger = false) {
+function loggedNumber(typed: string, previous: number | null | undefined, asInteger = false) {
   if (typed.trim() === "") return previous ?? 0;
   const parsed = asInteger ? parseInt(typed, 10) : Number(typed);
   return Number.isFinite(parsed) ? parsed : previous ?? 0;
@@ -474,7 +474,7 @@ export default function ActiveWorkoutLogger({
             exerciseId: exercise?.exerciseId,
             exerciseName,
             setNumber: r.setNumber,
-            weight: mode === "weight" ? loggedNumber(r.weight, previous?.weight) : 0,
+            weight: mode === "weight" ? loggedNumber(r.weight, previous?.weight) : null,
             reps: mode === "hold" ? 0 : loggedNumber(r.reps, previous?.reps, true),
             durationSeconds:
               mode === "hold"

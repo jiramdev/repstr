@@ -2,7 +2,7 @@ export type TrackingMode = "weight" | "reps" | "hold";
 
 export type StrengthEntry = {
   exerciseName: string;
-  weight: number;
+  weight: number | null;
   reps: number;
   durationSeconds: number | null;
   tracking: TrackingMode;
@@ -44,7 +44,7 @@ export function sessionMetric(entries: StrengthEntry[]) {
   let best = 0;
   let reps = 0;
   for (const entry of entries) {
-    const estimate = epley(entry.weight, entry.reps);
+    const estimate = epley(entry.weight ?? 0, entry.reps);
     if (estimate > best) best = estimate;
     reps = Math.max(reps, entry.reps);
   }

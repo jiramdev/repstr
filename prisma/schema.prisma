@@ -8,15 +8,16 @@ datasource db {
 }
 
 model User {
-  id             String          @id @default(cuid())
-  email          String          @unique
-  passwordHash   String
-  name           String?
-  heightCm       Float?
-  age            Int?
-  sex            String?
-  sessionVersion Int             @default(0)
-  createdAt      DateTime        @default(now())
+  id                  String   @id @default(cuid())
+  email               String   @unique
+  passwordHash        String
+  name                String?
+  heightCm            Float?
+  age                 Int?
+  sex                 String?
+  sessionVersion      Int      @default(0)
+  lastMorningSentDate String?
+  createdAt           DateTime @default(now())
 
   workoutPlans      WorkoutPlan[]
   exercises         Exercise[]
@@ -29,13 +30,18 @@ model User {
 }
 
 model RestTimer {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String
-  createdAt DateTime @default(now())
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token           String
+  status          String      @default("pending")
+  workoutLogId    String?
+  workoutLog      WorkoutLog? @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+  qstashMessageId String?
+  createdAt       DateTime    @default(now())
 
   @@unique([userId, token])
+  @@index([workoutLogId])
 }
 
 model WorkoutPlan {
@@ -51,32 +57,39 @@ model WorkoutPlan {
 }
 
 model Exercise {
-  id         String         @id @default(cuid())
-  userId     String
-  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name       String
-  nameKey    String
-  tracking   String         @default("weight")
-  createdAt  DateTime       @default(now())
-  placements PlanExercise[]
-  entries    LogEntry[]
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  nameKey     String
+  tracking    String         @default("weight")
+  defaultSets Int            @default(3)
+  repGoal     Int?
+  restSeconds Int            @default(90)
+  archived    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  placements  PlanExercise[]
+  entries     LogEntry[]
 
   @@unique([userId, nameKey])
   @@index([userId])
 }
 
 model PlanExercise {
-  id          String      @id @default(cuid())
-  planId      String
-  plan        WorkoutPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-  exerciseId  String?
-  exercise    Exercise?   @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
-  name        String
-  targetSets  Int
-  restSeconds Int
-  order       Int         @default(0)
+  id              String      @id @default(cuid())
+  planId          String
+  plan            WorkoutPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  exerciseId      String?
+  exercise        Exercise?   @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+  name            String
+  targetSets      Int
+  restSeconds     Int
+  setsOverride    Int?
+  repGoalOverride Int?
+  restOverride    Int?
+  order           Int         @default(0)
 
-  @@unique([planId, exerciseId])
+  @@unique([planId, order])
   @@index([exerciseId])
 }
 
@@ -91,7 +104,7 @@ model ScheduleDay {
   id         String         @id @default(cuid())
   scheduleId String
   schedule   WeeklySchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  dayOfWeek  Int            // 0 = Zondag, 1 = Maandag ... 6 = Zaterdag
+  dayOfWeek  Int // 0 = Zondag, 1 = Maandag ... 6 = Zaterdag
   planId     String?
   plan       WorkoutPlan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
 
@@ -99,16 +112,19 @@ model ScheduleDay {
 }
 
 model WorkoutLog {
-  id          String     @id @default(cuid())
+  id          String       @id @default(cuid())
   userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   planId      String?
   plan        WorkoutPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
-  startedAt   DateTime   @default(now())
+  status      String       @default("finished")
+  startedAt   DateTime     @default(now())
   completedAt DateTime?
   entries     LogEntry[]
+  restTimers  RestTimer[]
 
   @@index([userId, completedAt])
+  @@index([userId, status])
 }
 
 model LogEntry {
@@ -120,7 +136,7 @@ model LogEntry {
   exerciseName    String
   setNumber       Int
   reps            Int
-  weight          Float
+  weight          Float?
   durationSeconds Int?
 
   @@index([workoutLogId])

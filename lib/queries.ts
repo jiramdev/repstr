@@ -180,7 +180,7 @@ export function getActiveWorkout(userId: string, planId?: string) {
             },
           });
 
-    const setsByExercise = new Map<string, { weight: number; reps: number; durationSeconds: number | null }[]>();
+    const setsByExercise = new Map<string, { weight: number | null; reps: number; durationSeconds: number | null }[]>();
     for (const entry of history) {
       if (!entry.exerciseId) continue;
       const sets = setsByExercise.get(entry.exerciseId) ?? [];
@@ -192,7 +192,7 @@ export function getActiveWorkout(userId: string, planId?: string) {
       setsByExercise.set(entry.exerciseId, sets);
     }
 
-    const previousSets: Record<string, { weight: number; reps: number; durationSeconds: number | null }[]> = {};
+    const previousSets: Record<string, { weight: number | null; reps: number; durationSeconds: number | null }[]> = {};
     for (const exercise of exercises) {
       const sets = exercise.exerciseId ? setsByExercise.get(exercise.exerciseId) : undefined;
       if (sets?.length) previousSets[exercise.name] = sets;

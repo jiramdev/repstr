@@ -14,7 +14,7 @@ interface CompletedSet {
   exerciseId?: string | null;
   exerciseName: string;
   setNumber: number;
-  weight: number;
+  weight: number | null;
   reps: number;
   durationSeconds?: number | null;
 }
@@ -74,7 +74,7 @@ export async function finishWorkout({
             exerciseId: match?.id ?? null,
             exerciseName: match?.name || set.exerciseName,
             setNumber: set.setNumber,
-            weight: Number(set.weight) || 0,
+            weight: set.weight == null ? null : Number(set.weight) || 0,
             reps: Number(set.reps) || 0,
             durationSeconds:
               set.durationSeconds == null ? null : Number(set.durationSeconds) || 0,
