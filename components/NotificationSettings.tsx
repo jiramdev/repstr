@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useState } from "react";
 import { AlarmClock, BellRing, Check, FlaskConical, Smartphone, Timer } from "lucide-react";
-import { disableNotifications, enableNotifications } from "@/lib/enable-notifications";
+import { enableNotifications } from "@/lib/enable-notifications";
 import {
   saveReminderSettings,
   saveRestTimerEnabled,
