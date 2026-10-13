@@ -39,7 +39,7 @@ Copy `.env.example`. Everything except `VERCEL_AUTOMATION_BYPASS_SECRET` is requ
 
 ### Rate limiting
 
-Sign-in: 5 attempts per 15 minutes, enforced per email **and** per IP. Sign-up: 3 per hour per IP. Dutch message: "Te veel pogingen. Probeer het later opnieuw." Backed by `@upstash/ratelimit` + `@upstash/redis`; without the Upstash vars the app fails closed in production (in-memory fallback only in dev/test, or with `ALLOW_MEMORY_RATELIMIT=1`).
+Sign-in: 5 attempts per 15 minutes, enforced per email **and** per IP. Sign-up: 3 per hour per IP. Message: "Too many attempts, try again later." Backed by `@upstash/ratelimit` + `@upstash/redis`; without the Upstash vars the app fails closed in production (in-memory fallback only in dev/test, or with `ALLOW_MEMORY_RATELIMIT=1`).
 
 ## Backup before any migration
 

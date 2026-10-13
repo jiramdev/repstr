@@ -9,7 +9,7 @@ import { revalidateTabs } from "@/lib/revalidate-tabs";
 import { z } from "zod";
 import { dayOfWeekSchema, idSchema, nameSchema } from "@/lib/validation";
 
-// 1. Koppel een plan aan een specifieke dag (0 = Zo, 1 = Ma ... 6 = Za)
+// 1. Link a plan to a weekday (0 = Sun, 1 = Mon ... 6 = Sat)
 export async function assignPlanToDay(dayOfWeek: number, planId: string | null) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Not signed in");
@@ -31,14 +31,14 @@ export async function assignPlanToDay(dayOfWeek: number, planId: string | null) 
     if (!plan) throw new Error("Plan not found");
   }
 
-  // Zorg dat het WeeklySchedule record bestaat voor de gebruiker
+  // Make sure the WeeklySchedule row exists for the user
   const weeklySchedule = await prisma.weeklySchedule.upsert({
     where: { userId },
     update: {},
     create: { userId },
   });
 
-  // Koppel plan of zet op rustdag (planId: null)
+  // Link a plan or set a rest day (planId: null)
   await prisma.scheduleDay.upsert({
     where: {
       scheduleId_dayOfWeek: {
@@ -60,7 +60,7 @@ export async function assignPlanToDay(dayOfWeek: number, planId: string | null) 
   revalidateTabs();
 }
 
-// 2. Nieuw trainingsplan aanmaken
+// 2. Create a new training plan
 export async function createWorkoutPlan(name: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Not signed in");

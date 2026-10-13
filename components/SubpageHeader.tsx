@@ -7,7 +7,7 @@ export default function SubpageHeader({ title, href }: { title: string; href: st
       <Link
         href={href}
         prefetch={true}
-        aria-label="Terug"
+        aria-label="Back"
         className="w-10 h-10 rounded-full bg-[#141416] border border-white/[0.08] flex items-center justify-center text-white apple-press shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
       >
         <ChevronLeft className="w-5 h-5 stroke-[1.8]" />

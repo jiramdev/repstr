@@ -407,7 +407,7 @@ export default function ActiveWorkoutLogger({
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker.register("/sw.js").catch((err) => {
-      console.error("Service worker registreren mislukt:", err);
+      console.error("Failed to register service worker:", err);
     });
   }, []);
 
@@ -563,7 +563,7 @@ export default function ActiveWorkoutLogger({
           }
           writeDraft(tokenKey, token);
         })
-        .catch((err) => console.error("Achtergrond push plannen mislukt:", err));
+        .catch((err) => console.error("Failed to schedule background push:", err));
     },
     [cancelRestNotification, planId, sessionId, tokenKey]
   );

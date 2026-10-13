@@ -136,7 +136,7 @@ export async function POST(req: Request) {
     } catch (error) {
       // A scheduling failure must never break logging a set: the set is already
       // stored via the workout server action; only this timer row fails.
-      console.error("QStash plannen mislukt", { userId, token, delaySeconds, error });
+      console.error("Failed to schedule QStash", { userId, token, delaySeconds, error });
       await prisma.restTimer.updateMany({
         where: { userId, token, status: REST_STATUS.PENDING },
         data: { status: REST_STATUS.FAILED },

@@ -101,7 +101,7 @@ export async function checkRateLimit(
     const result = await active.limit(key);
     return { limited: !result.success };
   } catch (error) {
-    console.error("Rate limit controle mislukt:", error);
+    console.error("Rate limit check failed:", error);
     if (process.env.NODE_ENV === "production") return { limited: true };
     const limited = isRateLimited(key, limit, windowMs);
     if (!limited) recordAttempt(key, windowMs);

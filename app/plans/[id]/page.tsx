@@ -80,7 +80,7 @@ export default async function EditPlanPage({ params }: PageProps) {
       <main className="max-w-sm mx-auto space-y-3.5">
         <SubpageHeader title="Edit plan" href="/schedule" />
 
-        {/* Het interactieve bewerkingsscherm */}
+        {/* The interactive edit screen */}
         <PlanEditor
           planId={plan.id}
           initialName={plan.name}

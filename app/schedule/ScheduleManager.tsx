@@ -45,7 +45,7 @@ export default function ScheduleManager({ plans, initialDays }: ScheduleManagerP
     await assignPlanToDay(day, planId);
   };
 
-  // Nieuw plan aanmaken
+  // Create a new plan
   const handleCreatePlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlanName.trim()) return;
@@ -57,7 +57,7 @@ export default function ScheduleManager({ plans, initialDays }: ScheduleManagerP
   return (
     <div className="space-y-4">
       <Prefetch hrefs={plans.map((plan) => `/plans/${plan.id}`)} />
-      {/* 1. Week schedule overzicht (Ma t/m Zo) */}
+      {/* 1. Week schedule overview (Mon through Sun) */}
       <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] px-2 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
         <div className="flex items-center justify-between px-3 pb-1">
           <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
@@ -105,7 +105,7 @@ export default function ScheduleManager({ plans, initialDays }: ScheduleManagerP
         </div>
       </section>
 
-      {/* 2. Trainingsplannen Beheren & Aanmaken */}
+      {/* 2. Manage and create training plans */}
       <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
         <div className="flex items-center justify-between px-1">
           <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
@@ -118,7 +118,7 @@ export default function ScheduleManager({ plans, initialDays }: ScheduleManagerP
             className="flex items-center gap-1 text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            Nieuw
+            New
           </button>
         </div>
 
@@ -144,7 +144,7 @@ export default function ScheduleManager({ plans, initialDays }: ScheduleManagerP
               type="submit"
               className="bg-[#baa3d0] text-[#141416] font-semibold px-4 rounded-2xl text-[12px] uppercase tracking-wider apple-press"
             >
-              Opslaan
+              Save
             </button>
           </motion.form>
         )}

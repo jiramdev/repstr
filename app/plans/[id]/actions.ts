@@ -13,7 +13,7 @@ import { z } from "zod";
 import { idSchema, nameSchema, restSecondsSchema, setsSchema } from "@/lib/validation";
 import { redirect } from "next/navigation";
 
-// 1. Naam van het plan bijwerken
+// 1. Update the plan name
 export async function updatePlanName(planId: string, name: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Not signed in");
@@ -256,7 +256,7 @@ export async function reorderExercises(planId: string, orderedIds: string[]) {
   return { success: true };
 }
 
-// 3. Oefening verwijderen uit het plan
+// 3. Remove an exercise from the plan
 export async function removeExerciseFromPlan(planId: string, exerciseId: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Not signed in");
@@ -277,7 +277,7 @@ export async function removeExerciseFromPlan(planId: string, exerciseId: string)
   revalidatePath("/");
 }
 
-// 4. Volledig trainingsplan verwijderen
+// 4. Delete the whole training plan
 export async function deletePlan(planId: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Not signed in");
