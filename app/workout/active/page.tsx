@@ -28,15 +28,15 @@ export default async function ActiveWorkoutPage({ searchParams }: PageProps) {
           <>
             <SubpageHeader title="Workout" href="/schedule" />
             <section className="bg-[#141416] border border-white/[0.08] rounded-[34px] px-6 py-12 text-center shadow-[0_16px_36px_rgba(0,0,0,0.25)]">
-              <p className="font-editorial text-[28px] text-white leading-none">Geen oefeningen</p>
+              <p className="font-editorial text-[28px] text-white leading-none">No exercises</p>
               <p className="mt-3 text-[13px] text-[#a1a1aa]">
-                Dit plan heeft nog geen oefeningen. Voeg ze toe in je schema.
+                This plan has no exercises yet. Add them in your schedule.
               </p>
               <Link
                 href="/schedule"
                 className="mt-6 inline-block bg-[#baa3d0] text-[#141416] rounded-full px-5 py-3 font-editorial text-[16px] tracking-wider apple-press"
               >
-                NAAR SCHEMA
+                TO SCHEDULE
               </Link>
             </section>
           </>

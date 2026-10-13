@@ -76,10 +76,10 @@ const logSetSchema = completedSetSchema.omit({ setNumber: true }).extend({
 export async function logSet(sessionId: string, set: unknown) {
   const userId = await requireUserId();
   const session = await ownedSession(userId, sessionId);
-  if (!session) return { error: "Sessie niet gevonden." };
+  if (!session) return { error: "Session not found." };
 
   const parsed = logSetSchema.safeParse(set);
-  if (!parsed.success) return { error: "Ongeldige set." };
+  if (!parsed.success) return { error: "Invalid set." };
 
   const match = await prisma.exercise.findFirst({
     where: { userId, nameKey: exerciseKey(parsed.data.exerciseName) },
@@ -109,11 +109,11 @@ const updateSetSchema = completedSetSchema.omit({ exerciseId: true, exerciseName
 export async function updateLoggedSet(sessionId: string, entryId: string, set: unknown) {
   const userId = await requireUserId();
   const session = await ownedSession(userId, sessionId);
-  if (!session) return { error: "Sessie niet gevonden." };
-  if (!idSchema.safeParse(entryId).success) return { error: "Ongeldige set." };
+  if (!session) return { error: "Session not found." };
+  if (!idSchema.safeParse(entryId).success) return { error: "Invalid set." };
 
   const parsed = updateSetSchema.safeParse(set);
-  if (!parsed.success) return { error: "Ongeldige set." };
+  if (!parsed.success) return { error: "Invalid set." };
 
   const updated = await prisma.logEntry.updateMany({
     where: { id: entryId, workoutLogId: session.id, workoutLog: { userId } },
@@ -123,7 +123,7 @@ export async function updateLoggedSet(sessionId: string, entryId: string, set: u
       durationSeconds: parsed.data.durationSeconds ?? null,
     },
   });
-  if (updated.count === 0) return { error: "Set niet gevonden." };
+  if (updated.count === 0) return { error: "Set not found." };
   refreshUserCache(userId);
   return { success: true as const };
 }
@@ -131,13 +131,13 @@ export async function updateLoggedSet(sessionId: string, entryId: string, set: u
 export async function deleteLoggedSet(sessionId: string, entryId: string) {
   const userId = await requireUserId();
   const session = await ownedSession(userId, sessionId);
-  if (!session) return { error: "Sessie niet gevonden." };
-  if (!idSchema.safeParse(entryId).success) return { error: "Ongeldige set." };
+  if (!session) return { error: "Session not found." };
+  if (!idSchema.safeParse(entryId).success) return { error: "Invalid set." };
 
   const deleted = await prisma.logEntry.deleteMany({
     where: { id: entryId, workoutLogId: session.id, workoutLog: { userId } },
   });
-  if (deleted.count === 0) return { error: "Set niet gevonden." };
+  if (deleted.count === 0) return { error: "Set not found." };
   refreshUserCache(userId);
   return { success: true as const };
 }
@@ -146,7 +146,7 @@ export async function deleteLoggedSet(sessionId: string, entryId: string) {
 export async function skipSessionRest(sessionId: string) {
   const userId = await requireUserId();
   const session = await ownedSession(userId, sessionId);
-  if (!session) return { error: "Sessie niet gevonden." };
+  if (!session) return { error: "Session not found." };
   await cancelSessionTimers(userId, session.id);
   return { success: true as const };
 }
@@ -154,7 +154,7 @@ export async function skipSessionRest(sessionId: string) {
 export async function finishWorkoutSession(sessionId: string) {
   const userId = await requireUserId();
   const session = await ownedSession(userId, sessionId);
-  if (!session) return { error: "Sessie niet gevonden." };
+  if (!session) return { error: "Session not found." };
 
   await prisma.$transaction([
     prisma.restTimer.updateMany({
@@ -175,7 +175,7 @@ export async function finishWorkoutSession(sessionId: string) {
 export async function abandonWorkoutSession(sessionId: string) {
   const userId = await requireUserId();
   const session = await ownedSession(userId, sessionId);
-  if (!session) return { error: "Sessie niet gevonden." };
+  if (!session) return { error: "Session not found." };
 
   await prisma.$transaction([
     prisma.restTimer.updateMany({

@@ -267,14 +267,14 @@ function RestTimer({
 
   const body = (
     <>
-      <p className="text-[12px] font-semibold tracking-[0.22em] text-[#baa3d0] uppercase">Rust</p>
+      <p className="text-[12px] font-semibold tracking-[0.22em] text-[#baa3d0] uppercase">Rest</p>
       <p className="mt-2 font-editorial text-[92px] leading-none tracking-tight text-white">
         {Math.floor(left / 60)}:{(left % 60).toString().padStart(2, "0")}
       </p>
       <button
         type="button"
         onClick={onSkip}
-        aria-label="Rust overslaan"
+        aria-label="Skip rest"
         className="mt-4 bg-[#baa3d0] text-[#141416] rounded-full px-6 py-2.5 font-editorial text-[15px] tracking-wider apple-press"
       >
         OVERSLAAN
@@ -390,12 +390,12 @@ export default function ActiveWorkoutLogger({
       .then((result) => {
         if (cancelled) return;
         if ("sessionId" in result) setSessionId(result.sessionId);
-        else setSaveError("Sessie starten mislukt. Probeer het opnieuw.");
+        else setSaveError("Couldn't start the session. Try again.");
         setStarting(false);
       })
       .catch(() => {
         if (!cancelled) {
-          setSaveError("Sessie starten mislukt. Probeer het opnieuw.");
+          setSaveError("Couldn't start the session. Try again.");
           setStarting(false);
         }
       });
@@ -465,12 +465,12 @@ export default function ActiveWorkoutLogger({
                 await removeOp(op.id);
               } else {
                 await removeOp(op.id);
-                setSaveError(result.error ?? "Opslaan mislukt.");
+                setSaveError(result.error ?? "Save failed.");
               }
             } else if (op.kind === "update") {
               const result = await updateLoggedSet(activeSessionId, op.entryId, op.set);
               await removeOp(op.id);
-              if (!("success" in result)) setSaveError(result.error ?? "Opslaan mislukt.");
+              if (!("success" in result)) setSaveError(result.error ?? "Save failed.");
               else {
                 setRowsByExercise((current) => {
                   const next = { ...current };
@@ -485,7 +485,7 @@ export default function ActiveWorkoutLogger({
             } else {
               const result = await deleteLoggedSet(activeSessionId, op.entryId);
               await removeOp(op.id);
-              if (!("success" in result)) setSaveError(result.error ?? "Verwijderen mislukt.");
+              if (!("success" in result)) setSaveError(result.error ?? "Delete failed.");
             }
           } catch {
             // Offline or transient: keep the op queued and retry later.
@@ -512,7 +512,7 @@ export default function ActiveWorkoutLogger({
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
-    }).catch((err) => console.error("Rustmelding annuleren mislukt:", err));
+    }).catch((err) => console.error("Failed to cancel rest notification:", err));
   }, []);
 
   const dismissRestNotification = useCallback(() => {
@@ -622,7 +622,7 @@ export default function ActiveWorkoutLogger({
         const payload = setPayload(exercise, current, previous);
         enqueueOp({ kind: "create", clientKey: current.key, sessionId, set: payload })
           .then(() => drainOutbox(sessionId))
-          .catch((err) => console.error("Set opslaan mislukt:", err));
+          .catch((err) => console.error("Failed to save set:", err));
         startRestTimer(restDuration, exercise.name);
       } else {
         // Unchecking removes the logged set from the server; values stay editable.
@@ -633,7 +633,7 @@ export default function ActiveWorkoutLogger({
           const entryId = current.entryId;
           enqueueOp({ kind: "delete", clientKey: current.key, sessionId, entryId })
             .then(() => drainOutbox(sessionId))
-            .catch((err) => console.error("Set verwijderen mislukt:", err));
+            .catch((err) => console.error("Failed to delete set:", err));
         }
       }
     },
@@ -651,7 +651,7 @@ export default function ActiveWorkoutLogger({
         const entryId = current.entryId;
         enqueueOp({ kind: "delete", clientKey: current.key, sessionId, entryId })
           .then(() => drainOutbox(sessionId))
-          .catch((err) => console.error("Set verwijderen mislukt:", err));
+          .catch((err) => console.error("Failed to delete set:", err));
       }
     },
     [rowsByExercise, persistRows, sessionId, drainOutbox]
@@ -692,11 +692,6 @@ export default function ActiveWorkoutLogger({
     [rowsByExercise, persistRows, previousSets]
   );
 
-  const handleSkipExercise = useCallback(() => {
-    skipRest();
-    goStep(step + 1);
-  }, [goStep, skipRest, step]);
-
   const clearDrafts = useCallback(() => {
     writeDraft(setsKey, null);
     writeDraft(stepKey, null);
@@ -706,7 +701,7 @@ export default function ActiveWorkoutLogger({
     if (!sessionId) return;
     const completed = Object.values(rowsByExercise).flat().filter((row) => row.isCompleted);
     if (completed.length === 0) {
-      if (!confirm("Nog geen sets gelogd. Toch voltooien?")) return;
+      if (!confirm("No sets logged yet. Finish anyway?")) return;
     }
     setFinishing(true);
     setSaveError(null);
@@ -714,12 +709,12 @@ export default function ActiveWorkoutLogger({
       await drainOutbox(sessionId);
       const result = await finishWorkoutSession(sessionId);
       if (!("success" in result)) {
-        setSaveError(result.error ?? "Opslaan mislukt.");
+        setSaveError(result.error ?? "Save failed.");
         setFinishing(false);
         return;
       }
     } catch {
-      setSaveError("Opslaan mislukt. Je sets staan nog op dit apparaat.");
+      setSaveError("Save failed. Your sets are still on this device.");
       setFinishing(false);
       return;
     }
@@ -730,11 +725,11 @@ export default function ActiveWorkoutLogger({
 
   const handleAbandon = async () => {
     if (!sessionId) return;
-    if (!confirm("Workout verlaten? Gelogde sets blijven bewaard als verlaten sessie.")) return;
+    if (!confirm("Leave workout? Logged sets will be kept as an abandoned session.")) return;
     try {
       await abandonWorkoutSession(sessionId);
     } catch {
-      setSaveError("Verlaten mislukt. Probeer het opnieuw.");
+      setSaveError("Leaving failed. Try again.");
       return;
     }
     stopTimer();
@@ -755,7 +750,7 @@ export default function ActiveWorkoutLogger({
           type="button"
           onClick={handleAbandon}
           disabled={isFinishing || starting}
-          aria-label="Workout verlaten"
+          aria-label="Leave workout"
           className="w-10 h-10 rounded-full bg-[#141416] border border-white/[0.08] flex items-center justify-center text-white apple-press shadow-[0_4px_12px_rgba(0,0,0,0.15)] disabled:opacity-50"
         >
           <X className="w-5 h-5 stroke-[1.8]" />
@@ -763,12 +758,12 @@ export default function ActiveWorkoutLogger({
         <div className="h-10 bg-[#141416] border border-white/[0.08] px-4 rounded-full flex items-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
           <span className="w-2 h-2 rounded-full bg-[#baa3d0]" />
           <span className="font-editorial text-[14px] tracking-wider text-white leading-none uppercase">
-            Oefening {exercises.length ? step + 1 : 0} van {exercises.length}
+            Exercise {exercises.length ? step + 1 : 0} of {exercises.length}
           </span>
         </div>
         <div className="h-10 bg-[#141416] border border-white/[0.08] px-4 rounded-full flex items-center shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
           <span className="font-editorial text-[14px] tracking-wider text-white leading-none uppercase">
-            Set {currentSetNumber} van {Math.max(rows.length, 1)}
+            Set {currentSetNumber} of {Math.max(rows.length, 1)}
           </span>
         </div>
       </header>
@@ -777,7 +772,7 @@ export default function ActiveWorkoutLogger({
 
       {starting || !exercise ? (
         <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 text-center shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-          <p className="font-editorial text-[22px] tracking-wide text-white leading-none">Sessie starten…</p>
+          <p className="font-editorial text-[22px] tracking-wide text-white leading-none">Starting session…</p>
         </section>
       ) : (
         <ExerciseStep
@@ -793,7 +788,7 @@ export default function ActiveWorkoutLogger({
         />
       )}
 
-      <nav className="flex items-center gap-2.5" aria-label="Oefeningen">
+      <nav className="flex items-center gap-2.5" aria-label="Exercises">
         <button
           type="button"
           onClick={() => goStep(step - 1)}
@@ -801,17 +796,7 @@ export default function ActiveWorkoutLogger({
           className="flex-1 bg-[#141416] border border-white/[0.08] rounded-full py-3.5 flex items-center justify-center gap-1 text-white apple-press disabled:opacity-40"
         >
           <ChevronLeft className="w-4 h-4" />
-          <span className="font-editorial text-[15px] tracking-wider uppercase leading-none">Vorige</span>
-        </button>
-        <button
-          type="button"
-          onClick={handleSkipExercise}
-          disabled={starting}
-          className="flex-1 bg-[#141416] border border-white/[0.08] rounded-full py-3.5 text-center apple-press disabled:opacity-40"
-        >
-          <span className="font-editorial text-[15px] tracking-wider uppercase leading-none text-[#baa3d0]">
-            Overslaan
-          </span>
+          <span className="font-editorial text-[15px] tracking-wider uppercase leading-none">Previous</span>
         </button>
         <button
           type="button"
@@ -819,7 +804,7 @@ export default function ActiveWorkoutLogger({
           disabled={step >= exercises.length - 1 || starting}
           className="flex-1 bg-[#141416] border border-white/[0.08] rounded-full py-3.5 flex items-center justify-center gap-1 text-white apple-press disabled:opacity-40"
         >
-          <span className="font-editorial text-[15px] tracking-wider uppercase leading-none">Volgende</span>
+          <span className="font-editorial text-[15px] tracking-wider uppercase leading-none">Next</span>
           <ChevronRight className="w-4 h-4" />
         </button>
       </nav>
@@ -830,15 +815,22 @@ export default function ActiveWorkoutLogger({
         </p>
       )}
 
-      <button
-        onClick={handleFinish}
-        disabled={isFinishing || starting}
-        className="w-full bg-[#141416] border border-white/[0.08] rounded-[30px] py-4 text-center transition apple-press shadow-[0_12px_28px_rgba(0,0,0,0.2)] disabled:opacity-50"
+      <div className="h-24" aria-hidden="true" />
+
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 px-4 pt-6 bg-gradient-to-t from-[#baa3d0] via-[#baa3d0]/95 to-transparent"
+        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
       >
-        <span className="font-editorial text-[20px] tracking-wider text-[#baa3d0] uppercase leading-none block">
-          {isFinishing ? "OPSLAAN..." : "SESSIE VOLTOOIEN"}
-        </span>
-      </button>
+        <button
+          onClick={handleFinish}
+          disabled={isFinishing || starting}
+          className="w-full max-w-sm mx-auto block bg-[#141416] border border-white/[0.08] rounded-[30px] py-4 text-center transition apple-press shadow-[0_12px_28px_rgba(0,0,0,0.2)] disabled:opacity-50"
+        >
+          <span className="font-editorial text-[20px] tracking-wider text-[#baa3d0] uppercase leading-none block">
+            {isFinishing ? "SAVING..." : "FINISH WORKOUT"}
+          </span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -883,8 +875,8 @@ const ExerciseStep = memo(function ExerciseStep({
         <div className="flex items-center justify-between px-1 gap-2">
           <span className="text-[12px] text-[#a1a1aa] font-medium">
             {exercise.repGoal != null
-              ? `Doel: ${exercise.repGoal} ${tracking === "hold" ? "sec" : "reps"} · Rust ${restDuration}s`
-              : `Rust ${restDuration}s`}
+              ? `Target: ${exercise.repGoal} ${tracking === "hold" ? "sec" : "reps"} · Rest ${restDuration}s`
+              : `Rest ${restDuration}s`}
           </span>
           {lastPrevious && (
             <button
@@ -892,7 +884,7 @@ const ExerciseStep = memo(function ExerciseStep({
               onClick={onSameAsLast}
               className="text-[12px] font-semibold text-[#baa3d0] apple-press shrink-0"
             >
-              Zelfde als vorige keer
+              Same as last time
             </button>
           )}
         </div>
@@ -927,7 +919,7 @@ const ExerciseStep = memo(function ExerciseStep({
                 <input
                   type="number"
                   inputMode="decimal"
-                  aria-label={`Set ${row.setNumber} gewicht in kilo`}
+                  aria-label={`Set ${row.setNumber} weight in kilos`}
                   placeholder={previous?.weight != null ? String(previous.weight) : "—"}
                   value={row.weight}
                   disabled={isDone}
@@ -941,8 +933,8 @@ const ExerciseStep = memo(function ExerciseStep({
                 inputMode="numeric"
                 aria-label={
                   tracking === "hold"
-                    ? `Set ${row.setNumber} seconden`
-                    : `Set ${row.setNumber} herhalingen`
+                    ? `Set ${row.setNumber} seconds`
+                    : `Set ${row.setNumber} reps`
                 }
                 placeholder={
                   tracking === "hold"
@@ -965,7 +957,7 @@ const ExerciseStep = memo(function ExerciseStep({
                 {isDone && (
                   <button
                     type="button"
-                    aria-label={`Set ${row.setNumber} verwijderen`}
+                    aria-label={`Delete set ${row.setNumber}`}
                     onClick={() => onDelete(idx)}
                     className="w-7 h-7 rounded-full flex items-center justify-center text-[#71717a] hover:text-red-300 apple-press"
                   >
@@ -975,7 +967,7 @@ const ExerciseStep = memo(function ExerciseStep({
                 <button
                   type="button"
                   aria-pressed={isDone}
-                  aria-label={isDone ? `Set ${row.setNumber} afgevinkt` : `Set ${row.setNumber} afvinken`}
+                  aria-label={isDone ? `Set ${row.setNumber} checked off` : `Check off set ${row.setNumber}`}
                   onClick={() => onToggle(idx)}
                   className={`w-9 h-9 rounded-full flex items-center justify-center transition apple-press ${
                     isDone
@@ -998,11 +990,11 @@ const ExerciseStep = memo(function ExerciseStep({
           className="flex-1 border border-white/[0.08] rounded-full py-2.5 flex items-center justify-center gap-1.5 text-[#a1a1aa] apple-press"
         >
           <Plus className="w-4 h-4" />
-          <span className="text-[12px] font-semibold tracking-[0.14em] uppercase">Set toevoegen</span>
+          <span className="text-[12px] font-semibold tracking-[0.14em] uppercase">Add set</span>
         </button>
       </div>
       <p className="px-1 text-[11px] text-[#71717a]">
-        Tip: vink een set uit om hem aan te passen, of verwijder hem met het prullenbakje.
+        Tip: uncheck a set to edit it, or delete it with the trash icon.
       </p>
     </section>
   );
