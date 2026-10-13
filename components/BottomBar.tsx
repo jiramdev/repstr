@@ -85,7 +85,7 @@ export default function BottomBar() {
   const tabIndex = TAB_HREFS.indexOf(pathname as (typeof TAB_HREFS)[number]);
 
   useEffect(() => {
-    if (pathname === "/login" || pathname === "/register" || pathname.startsWith("/onboarding") || pathname === "/workout/active") return;
+    if (pathname === "/login" || pathname === "/register" || pathname.startsWith("/onboarding") || pathname.startsWith("/workout/")) return;
     for (const tab of TABS) {
       router.prefetch(tab.href);
     }
@@ -211,7 +211,7 @@ export default function BottomBar() {
     };
   }, [tabIndex, router]);
 
-  if (pathname === "/login" || pathname === "/register" || pathname.startsWith("/onboarding") || pathname === "/workout/active") {
+  if (pathname === "/login" || pathname === "/register" || pathname.startsWith("/onboarding") || pathname.startsWith("/workout/")) {
     return null;
   }
 

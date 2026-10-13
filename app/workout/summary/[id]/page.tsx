@@ -10,6 +10,7 @@ import { asTracking } from "@/lib/exercise-library";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }
 
 function formatDuration(startedAt: Date, completedAt: Date | null) {
@@ -27,11 +28,13 @@ function formatSet(entry: { weight: number | null; reps: number; durationSeconds
   return `${entry.reps} reps`;
 }
 
-export default async function WorkoutSummaryPage({ params }: PageProps) {
+export default async function WorkoutSummaryPage({ params, searchParams }: PageProps) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
 
   const { id } = await params;
+  const { from } = await searchParams;
+  const backHref = from === "/analytics" ? "/analytics" : "/";
   const workout = await prisma.workoutLog.findFirst({
     where: { id, userId: session.user.id },
     select: {
@@ -69,7 +72,7 @@ export default async function WorkoutSummaryPage({ params }: PageProps) {
   return (
     <div className="min-h-dvh bg-[#baa3d0] text-white pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 px-4 select-none">
       <main className="max-w-sm mx-auto space-y-3.5">
-        <SubpageHeader title="Workout" href="/" />
+        <SubpageHeader title="Workout" href={backHref} />
 
         <section className="bg-[#141416] border border-white/[0.08] rounded-[34px] px-6 py-8 text-center shadow-[0_16px_36px_rgba(0,0,0,0.25)] space-y-2">
           <p className="text-[12px] font-semibold tracking-[0.2em] text-[#baa3d0] uppercase">
@@ -112,7 +115,7 @@ export default async function WorkoutSummaryPage({ params }: PageProps) {
         </section>
 
         <Link
-          href="/"
+          href={backHref}
           prefetch={true}
           className="block w-full bg-[#141416] border border-white/[0.08] rounded-[30px] py-4 text-center apple-press shadow-[0_12px_28px_rgba(0,0,0,0.2)]"
         >

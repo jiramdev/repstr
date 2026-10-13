@@ -386,18 +386,24 @@ export default function PlanEditor({
               className={darkFieldClass}
             />
           </div>
-          <div className="flex gap-2">
-            <SaveButton>Save</SaveButton>
-            <CancelButton onClick={() => setName(initialName)} />
-          </div>
+          {name.trim() !== initialName.trim() && (
+            <div className="flex items-center gap-2.5">
+              <button
+                type="submit"
+                className="flex-1 bg-[#141416] border border-white/[0.08] rounded-full py-3.5 flex items-center justify-center text-white apple-press"
+              >
+                <span className="font-editorial text-[15px] tracking-wider uppercase leading-none">Save</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setName(initialName)}
+                className="flex-1 bg-[#141416] border border-white/[0.08] rounded-full py-3.5 flex items-center justify-center text-white apple-press"
+              >
+                <span className="font-editorial text-[15px] tracking-wider uppercase leading-none">Cancel</span>
+              </button>
+            </div>
+          )}
         </form>
-        <button
-          type="button"
-          onClick={handleDeletePlan}
-          className="w-full text-center text-[12px] font-semibold text-red-300/70 py-1 apple-press"
-        >
-          Delete plan
-        </button>
       </section>
 
       <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
@@ -624,17 +630,6 @@ export default function PlanEditor({
                       max={600}
                       onChange={setEditRest}
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditSets("");
-                        setEditRepGoal("");
-                        setEditRest("");
-                      }}
-                      className="w-full text-center text-[12px] font-semibold text-[#baa3d0] apple-press"
-                    >
-                      Reset to default
-                    </button>
                     {editError && <p className="text-[12px] text-red-300">{editError}</p>}
                     <div className="flex gap-2">
                       <SaveButton>Save</SaveButton>
@@ -706,6 +701,14 @@ export default function PlanEditor({
           </SortableContext>
         </DndContext>
       </section>
+
+      <button
+        type="button"
+        onClick={handleDeletePlan}
+        className="w-full bg-[#1b1b1e] border border-white/[0.08] text-red-300 rounded-full py-3.5 font-editorial text-[18px] tracking-wider apple-press"
+      >
+        DELETE PLAN
+      </button>
     </div>
   );
 }

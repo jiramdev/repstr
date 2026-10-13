@@ -201,9 +201,17 @@ test("full flow: signup, onboarding, exercise, plan, schedule, workout, stats", 
   // Logging 60 kg gives a PR of 60 kg.
   await expect(page.getByText("E2E Bench").first()).toBeVisible();
   await expect(page.getByText("60", { exact: true }).first()).toBeVisible();
-  // Every history workout links to the same summary screen.
-  await page.locator("details summary").first().click();
-  await page.getByRole("link", { name: "View summary" }).first().click();
+  // Every history workout links straight to the same summary screen.
+  await page.getByRole("link", { name: /E2E Plan/ }).first().click();
   await expect(page).toHaveURL(/\/workout\/summary\/.+/);
   await expect(page.getByText("E2E Plan").first()).toBeVisible();
+  await page.getByRole("link", { name: "DONE" }).click();
+  await expect(page).toHaveURL("/analytics");
+
+  // Notifications screen renders with device status and reminder controls.
+  await page.goto("/notifications");
+  await expect(page.getByText("This device")).toBeVisible();
+  await expect(page.getByText("Rest timer")).toBeVisible();
+  await expect(page.getByText("Daily reminder")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send test notification" })).toBeVisible();
 });

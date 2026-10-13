@@ -168,39 +168,20 @@ export default function AnalyticsPanel({
           ) : (
             <div className="space-y-2 pt-1">
               {history.map((workout) => (
-                <details
+                <Link
                   key={workout.id}
-                  className="bg-[#1b1b1e] rounded-2xl px-4 py-3 border border-white/[0.04] group"
+                  href={`/workout/summary/${workout.id}?from=/analytics`}
+                  prefetch={true}
+                  className="bg-[#1b1b1e] rounded-2xl px-4 py-3 flex items-center justify-between gap-3 border border-white/[0.04] apple-press"
                 >
-                  <summary className="flex items-center justify-between gap-3 cursor-pointer list-none">
-                    <span className="text-[14px] font-medium text-white truncate">
-                      {formatAmsterdamDate(workout.completedAt)}
-                      {workout.planName ? ` · ${workout.planName}` : ""}
-                    </span>
-                    <span className="text-[11px] text-[#71717a] font-medium shrink-0">
-                      {workout.entries.length} {workout.entries.length === 1 ? "set" : "sets"}
-                    </span>
-                  </summary>
-                  <div className="pt-2 space-y-1">
-                    {workout.entries.map((entry, idx) => (
-                      <p key={idx} className="text-[12px] text-[#a1a1aa]">
-                        {entry.exerciseName} ·{" "}
-                        {entry.tracking === "hold"
-                          ? `${entry.durationSeconds ?? 0} sec`
-                          : entry.tracking === "weight"
-                            ? `${entry.reps}x ${entry.weight ?? 0} kg`
-                            : `${entry.reps} reps`}
-                      </p>
-                    ))}
-                    <Link
-                      href={`/workout/summary/${workout.id}`}
-                      prefetch={true}
-                      className="inline-block pt-1 text-[12px] font-semibold text-[#baa3d0] apple-press"
-                    >
-                      View summary →
-                    </Link>
-                  </div>
-                </details>
+                  <span className="text-[14px] font-medium text-white truncate">
+                    {formatAmsterdamDate(workout.completedAt)}
+                    {workout.planName ? ` · ${workout.planName}` : ""}
+                  </span>
+                  <span className="text-[11px] text-[#71717a] font-medium shrink-0">
+                    {workout.entries.length} {workout.entries.length === 1 ? "set" : "sets"}
+                  </span>
+                </Link>
               ))}
             </div>
           )}
