@@ -2,37 +2,35 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { Client } from "@upstash/qstash";
+import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { REST_STATUS } from "@/lib/notifications";
+import { delaySecondsSchema, planIdSchema, tokenSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
-const MIN_DELAY_SECONDS = 1;
-const MAX_DELAY_SECONDS = 60 * 60;
+const subscriptionSchema = z.object({
+  endpoint: z.string().url().max(2000),
+  keys: z.object({
+    p256dh: z.string().min(1).max(500),
+    auth: z.string().min(1).max(500),
+  }),
+});
 
-function restDelaySeconds(value: unknown) {
-  const parsed = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return 90;
-  return Math.min(MAX_DELAY_SECONDS, Math.max(MIN_DELAY_SECONDS, Math.round(parsed)));
-}
+const postSchema = z.object({
+  subscription: subscriptionSchema,
+  delaySeconds: delaySecondsSchema.default(90),
+  exerciseName: z.string().trim().max(80).optional().default(""),
+  planId: planIdSchema,
+  token: tokenSchema,
+  workoutLogId: z.string().min(1).max(64).nullish(),
+});
 
 function appOrigin() {
   const raw = process.env.APP_URL?.trim().replace(/\/$/, "");
   if (!raw || !/^https?:\/\//i.test(raw)) return null;
   return raw;
-}
-
-function readSubscription(value: unknown) {
-  if (!value || typeof value !== "object") return null;
-  const subscription = value as {
-    endpoint?: unknown;
-    keys?: { p256dh?: unknown; auth?: unknown };
-  };
-  if (typeof subscription.endpoint !== "string" || !subscription.endpoint) return null;
-  const p256dh = subscription.keys?.p256dh;
-  const auth = subscription.keys?.auth;
-  if (typeof p256dh !== "string" || typeof auth !== "string" || !p256dh || !auth) return null;
-  return { endpoint: subscription.endpoint, p256dh, auth };
 }
 
 export async function POST(req: Request) {
@@ -41,17 +39,19 @@ export async function POST(req: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
     }
+    const userId = session.user.id;
 
-    const { subscription, delaySeconds, exerciseName, planId, token } = await req.json();
-
-    if (typeof token !== "string" || !token) {
-      return NextResponse.json({ error: "Geen timer" }, { status: 400 });
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Ongeldige aanvraag" }, { status: 400 });
     }
-
-    const storedSubscription = readSubscription(subscription);
-    if (!storedSubscription) {
-      return NextResponse.json({ error: "Geen subscription" }, { status: 400 });
+    const parsed = postSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Ongeldige aanvraag" }, { status: 400 });
     }
+    const { subscription, delaySeconds, exerciseName, planId, token, workoutLogId } = parsed.data;
 
     const qstashToken = process.env.QSTASH_TOKEN;
     const origin = appOrigin();
@@ -64,47 +64,89 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "APP_URL ontbreekt" }, { status: 500 });
     }
 
-    await prisma.pushSubscription.upsert({
-      where: { endpoint: storedSubscription.endpoint },
-      create: {
-        userId: session.user.id,
-        endpoint: storedSubscription.endpoint,
-        p256dh: storedSubscription.p256dh,
-        auth: storedSubscription.auth,
-      },
-      update: {
-        userId: session.user.id,
-        p256dh: storedSubscription.p256dh,
-        auth: storedSubscription.auth,
-      },
+    // Never move an endpoint to another user: same user updates keys,
+    // a different user deletes the old row and creates a new one.
+    const existing = await prisma.pushSubscription.findUnique({
+      where: { endpoint: subscription.endpoint },
+      select: { id: true, userId: true },
     });
+    if (!existing) {
+      await prisma.pushSubscription.create({
+        data: {
+          userId,
+          endpoint: subscription.endpoint,
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth,
+        },
+      });
+    } else if (existing.userId === userId) {
+      await prisma.pushSubscription.update({
+        where: { id: existing.id },
+        data: { p256dh: subscription.keys.p256dh, auth: subscription.keys.auth },
+      });
+    } else {
+      await prisma.pushSubscription.delete({ where: { id: existing.id } });
+      await prisma.pushSubscription.create({
+        data: {
+          userId,
+          endpoint: subscription.endpoint,
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth,
+        },
+      });
+    }
+
+    // Link the timer to the user's own in-progress session when provided.
+    let sessionId: string | null = null;
+    if (workoutLogId) {
+      const owned = await prisma.workoutLog.findFirst({
+        where: { id: workoutLogId, userId, status: "in_progress" },
+        select: { id: true },
+      });
+      sessionId = owned?.id ?? null;
+    }
 
     await prisma.restTimer.upsert({
-      where: { userId_token: { userId: session.user.id, token } },
-      create: { userId: session.user.id, token },
-      update: {},
+      where: { userId_token: { userId, token } },
+      create: { userId, token, status: REST_STATUS.PENDING, workoutLogId: sessionId },
+      update: { status: REST_STATUS.PENDING, workoutLogId: sessionId, qstashMessageId: null },
     });
 
-    const client = new Client({ token: qstashToken });
-    const headers: Record<string, string> = {};
-    const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-    if (bypass) headers["x-vercel-protection-bypass"] = bypass;
+    const name = exerciseName.trim() ? exerciseName.trim() : "je oefening";
 
-    const name =
-      typeof exerciseName === "string" && exerciseName.trim()
-        ? exerciseName.trim().slice(0, 80)
-        : "je oefening";
+    let messageId: string | null = null;
+    try {
+      const client = new Client({ token: qstashToken });
+      const headers: Record<string, string> = {};
+      const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+      if (bypass) headers["x-vercel-protection-bypass"] = bypass;
 
-    await client.publishJSON({
-      url: `${origin}/api/rest-timer/send`,
-      body: {
-        exerciseName: name,
-        planId: typeof planId === "string" && planId ? planId : null,
-        userId: session.user.id,
-        token,
-      },
-      delay: restDelaySeconds(delaySeconds),
-      headers: Object.keys(headers).length > 0 ? headers : undefined,
+      const published = await client.publishJSON({
+        url: `${origin}/api/rest-timer/send`,
+        body: {
+          exerciseName: name,
+          planId: planId ?? null,
+          userId,
+          token,
+        },
+        delay: delaySeconds,
+        headers: Object.keys(headers).length > 0 ? headers : undefined,
+      });
+      messageId = typeof published.messageId === "string" ? published.messageId : null;
+    } catch (error) {
+      // A scheduling failure must never break logging a set: the set is already
+      // stored via the workout server action; only this timer row fails.
+      console.error("QStash plannen mislukt", { userId, token, delaySeconds, error });
+      await prisma.restTimer.updateMany({
+        where: { userId, token, status: REST_STATUS.PENDING },
+        data: { status: REST_STATUS.FAILED },
+      });
+      return NextResponse.json({ error: "Kon timer niet inplannen" }, { status: 500 });
+    }
+
+    await prisma.restTimer.updateMany({
+      where: { userId, token },
+      data: { qstashMessageId: messageId },
     });
 
     return NextResponse.json({ success: true });
@@ -114,6 +156,8 @@ export async function POST(req: Request) {
   }
 }
 
+const deleteSchema = z.object({ token: tokenSchema });
+
 export async function DELETE(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -121,13 +165,21 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Niet ingelogd" }, { status: 401 });
     }
 
-    const { token } = await req.json();
-    if (typeof token !== "string" || !token) {
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Geen timer" }, { status: 400 });
+    }
+    const parsed = deleteSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json({ error: "Geen timer" }, { status: 400 });
     }
 
-    await prisma.restTimer.deleteMany({
-      where: { userId: session.user.id, token },
+    // Cancel only pending rows of the user's own session.
+    await prisma.restTimer.updateMany({
+      where: { userId: session.user.id, token: parsed.data.token, status: REST_STATUS.PENDING },
+      data: { status: REST_STATUS.CANCELLED },
     });
 
     return NextResponse.json({ success: true });

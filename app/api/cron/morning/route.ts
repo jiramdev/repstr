@@ -15,12 +15,15 @@ function exerciseLine(names: string[]) {
 
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
+  // Fail closed: reject when CRON_SECRET is missing or does not match.
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Niet toegestaan" }, { status: 401 });
   }
 
   const { dayOfWeek, hour, dateKey } = amsterdamParts();
-  if (dayOfWeek < 0 || hour !== 8) {
+  // vercel.json triggers at 05:00, 06:00 and 07:00 UTC so that one of them
+  // lands on 07:00 Amsterdam time in both CET and CEST. Only that run sends.
+  if (dayOfWeek < 0 || dayOfWeek > 6 || hour !== 7) {
     return NextResponse.json({ skipped: true });
   }
 
@@ -71,6 +74,13 @@ export async function GET(req: Request) {
   });
   const done = new Set(alreadySent.map((item) => item.userId));
 
+  // Exactly once per day per user: skip anyone already recorded for today.
+  const sentDates = await prisma.user.findMany({
+    where: { id: { in: [...byUser.keys()] }, lastMorningSentDate: dateKey },
+    select: { id: true },
+  });
+  for (const row of sentDates) done.add(row.id);
+
   const devices = new Map<string, typeof subscriptions>();
   for (const subscription of subscriptions) {
     if (done.has(subscription.userId) || !byUser.has(subscription.userId)) continue;
@@ -107,6 +117,11 @@ export async function GET(req: Request) {
     }
 
     notified.add(userId);
+    await prisma.user
+      .update({ where: { id: userId }, data: { lastMorningSentDate: dateKey } })
+      .catch((error) => {
+        console.error("Ochtendmelding datum opslaan mislukt", { userId, dateKey, error });
+      });
 
     for (const subscription of userDevices) {
       try {
@@ -124,7 +139,7 @@ export async function GET(req: Request) {
         if (status === 404 || status === 410) {
           await prisma.pushSubscription.delete({ where: { endpoint: subscription.endpoint } }).catch(() => {});
         } else {
-          console.error("Ochtendmelding versturen mislukt:", status ?? error);
+          console.error("Ochtendmelding versturen mislukt", { userId, status });
         }
       }
     }

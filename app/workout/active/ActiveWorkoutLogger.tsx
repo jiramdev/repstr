@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";
 import { motion } from "motion/react";
 import { popTransition } from "@/lib/motion";
+import { secondsRemaining as remainingSeconds } from "@/lib/notifications";
 import { finishWorkout } from "./actions";
 import {
   draftKey,
@@ -136,7 +137,7 @@ function RestTimer({
     if (target == null) return;
     let stopped = false;
     const tick = () => {
-      const remaining = Math.max(0, Math.ceil((target - Date.now()) / 1000));
+      const remaining = remainingSeconds(target, Date.now());
       if (remaining <= 0) {
         if (!stopped) {
           stopped = true;
@@ -166,18 +167,18 @@ function RestTimer({
 
   const body = (
     <>
-      <button
-        type="button"
-        onClick={onCancel}
-        aria-label="Timer stoppen"
-        className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/[0.06] text-[#a1a1aa] flex items-center justify-center apple-press"
-      >
-        <X className="w-4 h-4 stroke-[2.5]" />
-      </button>
       <p className="text-[12px] font-semibold tracking-[0.22em] text-[#baa3d0] uppercase">Rust</p>
       <p className="mt-2 font-editorial text-[92px] leading-none tracking-tight text-white">
         {Math.floor(secondsRemaining / 60)}:{(secondsRemaining % 60).toString().padStart(2, "0")}
       </p>
+      <button
+        type="button"
+        onClick={onCancel}
+        aria-label="Rust overslaan"
+        className="mt-4 bg-[#baa3d0] text-[#141416] rounded-full px-6 py-2.5 font-editorial text-[15px] tracking-wider apple-press"
+      >
+        OVERSLAAN
+      </button>
     </>
   );
 

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
 import webpush from "web-push";
 import prisma from "@/lib/prisma";
+import { REST_STATUS, resolveRestStatus } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -66,14 +67,21 @@ export async function POST(req: Request) {
     const timer = await prisma.restTimer.findUnique({
       where: { userId_token: { userId, token } },
     });
-    if (!timer) {
+    if (!timer || timer.status !== REST_STATUS.PENDING) {
       return NextResponse.json({ skipped: true });
     }
 
     const subscriptions = await prisma.pushSubscription.findMany({
       where: { userId },
     });
-    if (subscriptions.length === 0) return NextResponse.json({ sent: 0 });
+    if (subscriptions.length === 0) {
+      console.error("Geen push-subscriptions voor rusttimer", { userId, token });
+      await prisma.restTimer.update({
+        where: { id: timer.id },
+        data: { status: REST_STATUS.CANCELLED },
+      });
+      return NextResponse.json({ sent: 0 });
+    }
 
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -118,16 +126,25 @@ export async function POST(req: Request) {
           await prisma.pushSubscription.delete({ where: { endpoint: subscription.endpoint } }).catch(() => {});
         } else {
           failed += 1;
-          console.error("Fout bij verzenden push:", status ?? error);
+          console.error("Fout bij verzenden push", {
+            userId,
+            token,
+            subscriptionId: subscription.id,
+            status,
+          });
         }
       }
     }
 
+    // Mark sent only if at least one push succeeded, otherwise failed.
+    const status = resolveRestStatus(sent);
+    await prisma.restTimer.update({ where: { id: timer.id }, data: { status } }).catch((error) => {
+      console.error("Rusttimer-status opslaan mislukt", { userId, token, status, error });
+    });
+
     if (sent === 0 && failed > 0) {
       return NextResponse.json({ error: "Push mislukt" }, { status: 500 });
     }
-
-    await prisma.restTimer.delete({ where: { id: timer.id } }).catch(() => undefined);
 
     return NextResponse.json({ success: true, sent });
   } catch (error) {
