@@ -9,5 +9,11 @@ export default async function AnalyticsPage() {
   if (!session?.user?.id) redirect("/login");
 
   const analytics = await getAnalytics(session.user.id);
-  return <AnalyticsPanel workouts={analytics.workouts} weightLogs={analytics.weightLogs} />;
+  return (
+    <AnalyticsPanel
+      workouts={analytics.workouts}
+      weightLogs={analytics.weightLogs}
+      scheduledDays={analytics.scheduledDays}
+    />
+  );
 }

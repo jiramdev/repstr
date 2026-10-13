@@ -6,6 +6,7 @@ import { Check, ChevronLeft, ChevronRight, Plus, Trash2, X } from "lucide-react"
 import { motion } from "motion/react";
 import { popTransition } from "@/lib/motion";
 import { secondsRemaining as remainingSeconds } from "@/lib/notifications";
+import { placeholderSet } from "@/lib/strength";
 import {
   abandonWorkoutSession,
   deleteLoggedSet,
@@ -891,7 +892,7 @@ const ExerciseStep = memo(function ExerciseStep({
       <div className="space-y-2">
         {rows.map((row, idx) => {
           const isDone = row.isCompleted;
-          const previous = previousSets?.[row.setNumber - 1] ?? (idx === rows.length - 1 ? lastPrevious : undefined);
+          const previous = placeholderSet(previousSets, row.setNumber);
 
           return (
             <div

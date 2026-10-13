@@ -235,19 +235,24 @@ export async function getActiveSession(userId: string) {
 
 export function getAnalytics(userId: string) {
   return cached(userId, "analytics", async () => {
-    const [workouts, weightLogs] = await Promise.all([
+    const [workouts, weightLogs, scheduledDays] = await Promise.all([
       prisma.workoutLog.findMany({
-        where: { userId, completedAt: { not: null } },
+        where: { userId, status: "finished", completedAt: { not: null } },
         select: {
+          id: true,
+          planId: true,
+          plan: { select: { name: true } },
           completedAt: true,
           entries: {
             select: {
               exerciseName: true,
+              setNumber: true,
               weight: true,
               reps: true,
               durationSeconds: true,
               exercise: { select: { name: true, tracking: true } },
             },
+            orderBy: [{ exerciseName: "asc" }, { setNumber: "asc" }],
           },
         },
         orderBy: { completedAt: "asc" },
@@ -257,13 +262,21 @@ export function getAnalytics(userId: string) {
         orderBy: { loggedAt: "asc" },
         select: { weight: true, loggedAt: true },
       }),
+      prisma.scheduleDay.findMany({
+        where: { schedule: { userId }, planId: { not: null } },
+        select: { dayOfWeek: true },
+      }),
     ]);
 
     return {
       workouts: workouts.map((workout) => ({
+        id: workout.id,
+        planId: workout.planId,
+        planName: workout.plan?.name ?? null,
         completedAt: workout.completedAt!.toISOString(),
         entries: workout.entries.map((entry) => ({
           exerciseName: entry.exercise?.name || entry.exerciseName,
+          setNumber: entry.setNumber,
           weight: entry.weight,
           reps: entry.reps,
           durationSeconds: entry.durationSeconds,
@@ -274,6 +287,7 @@ export function getAnalytics(userId: string) {
         weight: log.weight,
         loggedAt: log.loggedAt.toISOString(),
       })),
+      scheduledDays: scheduledDays.map((day) => day.dayOfWeek),
     };
   });
 }

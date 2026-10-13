@@ -21,6 +21,12 @@ export type ExerciseProgress = {
   changePct: number | null;
 };
 
+/** Placeholder source for a set: the same set number last time, else the last set. */
+export function placeholderSet<T>(previous: T[] | undefined, setNumber: number): T | undefined {
+  if (!previous?.length) return undefined;
+  return previous[setNumber - 1] ?? previous[previous.length - 1];
+}
+
 function epley(weight: number, reps: number) {
   if (weight <= 0 || reps <= 0) return 0;
   if (reps === 1) return weight;
