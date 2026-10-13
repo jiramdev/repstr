@@ -91,7 +91,7 @@ export async function checkRateLimit(
       return { limited: true };
     }
     if (process.env.NODE_ENV === "production") {
-      console.warn("Rate limit valt terug op geheugen (ALLOW_MEMORY_RATELIMIT, alleen voor tests)");
+      console.warn("Rate limit falling back to memory (ALLOW_MEMORY_RATELIMIT, tests only)");
     }
     const limited = isRateLimited(key, limit, windowMs);
     if (!limited) recordAttempt(key, windowMs);
