@@ -5,13 +5,7 @@ import { headers } from "next/headers";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { passwordRuleError } from "@/lib/password";
-import {
-  REGISTER_ATTEMPT_LIMIT,
-  REGISTER_WINDOW_MS,
-  clientIp,
-  isRateLimited,
-  recordAttempt,
-} from "@/lib/rate-limit";
+import { TOO_MANY_ATTEMPTS_NL, clientIp, limitSignUp } from "@/lib/rate-limit";
 
 export async function registerUser(formData: FormData) {
   const name = formData.get("name") as string;
@@ -26,11 +20,9 @@ export async function registerUser(formData: FormData) {
   if (tooShort) return { error: tooShort };
 
   const ip = clientIp(await headers());
-  const limitKey = `register:${ip}`;
-  if (isRateLimited(limitKey, REGISTER_ATTEMPT_LIMIT, REGISTER_WINDOW_MS)) {
-    return { error: "Te veel pogingen. Probeer het later opnieuw." };
+  if ((await limitSignUp(ip)).limited) {
+    return { error: TOO_MANY_ATTEMPTS_NL };
   }
-  recordAttempt(limitKey, REGISTER_WINDOW_MS);
 
   const existing = await prisma.user.findUnique({
     where: { email },

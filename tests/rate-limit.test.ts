@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { isRateLimited, recordAttempt } from "@/lib/rate-limit";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  TOO_MANY_ATTEMPTS_NL,
+  checkRateLimit,
+  isRateLimited,
+  limitSignIn,
+  limitSignUp,
+  recordAttempt,
+} from "@/lib/rate-limit";
 
 describe("rate limit", () => {
   it("blocks a key after the configured number of attempts", () => {
@@ -11,5 +18,51 @@ describe("rate limit", () => {
     recordAttempt(key, 1000, now);
     expect(isRateLimited(key, 3, 1000, now)).toBe(true);
     expect(isRateLimited(key, 3, 1000, now + 1000)).toBe(false);
+  });
+});
+
+describe("upstash rate limit fallback", () => {
+  const env = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...env };
+    vi.unstubAllEnvs();
+  });
+
+  it("limits sign-in after 5 attempts per email without Upstash configured", async () => {
+    const email = `user-${Math.random()}@example.com`;
+    for (let i = 0; i < 5; i++) {
+      const decision = await limitSignIn(email, `10.0.0.${i}`);
+      expect(decision.limited).toBe(false);
+    }
+    expect((await limitSignIn(email, "10.0.0.99")).limited).toBe(true);
+  });
+
+  it("limits sign-in per IP as well", async () => {
+    const ip = `10.9.9.${Math.floor(Math.random() * 100000)}`;
+    for (let i = 0; i < 5; i++) {
+      const decision = await limitSignIn(`other-${Math.random()}-${i}@example.com`, ip);
+      expect(decision.limited).toBe(false);
+    }
+    expect((await limitSignIn("fresh@example.com", ip)).limited).toBe(true);
+  });
+
+  it("limits sign-up after 3 attempts per IP without Upstash configured", async () => {
+    const ip = `192.0.2.${Math.floor(Math.random() * 100000)}`;
+    for (let i = 0; i < 3; i++) {
+      expect((await limitSignUp(ip)).limited).toBe(false);
+    }
+    expect((await limitSignUp(ip)).limited).toBe(true);
+  });
+
+  it("fails closed in production when Upstash vars are missing", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    expect((await checkRateLimit(`closed:${Math.random()}`, 5, 60000)).limited).toBe(true);
+  });
+
+  it("uses the Dutch too-many-attempts message", () => {
+    expect(TOO_MANY_ATTEMPTS_NL).toBe("Te veel pogingen. Probeer het later opnieuw.");
   });
 });

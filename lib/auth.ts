@@ -4,7 +4,16 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { sessionStillValid } from "@/lib/session-version";
-import { LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS, isRateLimited, recordAttempt } from "@/lib/rate-limit";
+import { TOO_MANY_ATTEMPTS_NL, limitSignIn } from "@/lib/rate-limit";
+
+function ipFromAuthorizeReq(req: unknown) {
+  const headers = (req as { headers?: Record<string, unknown> } | null)?.headers;
+  const forwarded = headers?.["x-forwarded-for"] ?? headers?.["X-Forwarded-For"];
+  const first = typeof forwarded === "string" ? forwarded.split(",")[0]?.trim() : "";
+  if (first) return first;
+  const realIp = headers?.["x-real-ip"] ?? headers?.["X-Real-Ip"];
+  return typeof realIp === "string" && realIp.trim() ? realIp.trim() : "unknown";
+}
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -20,15 +29,15 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Vul een e-mail en wachtwoord in");
         }
 
         const email = credentials.email.toLowerCase();
-        const limitKey = `login:${email}`;
-        if (isRateLimited(limitKey, LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS)) {
-          throw new Error("Te veel pogingen. Probeer het later opnieuw.");
+        const ip = ipFromAuthorizeReq(req);
+        if ((await limitSignIn(email, ip)).limited) {
+          throw new Error(TOO_MANY_ATTEMPTS_NL);
         }
 
         const user = await prisma.user.findUnique({
@@ -36,14 +45,12 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.passwordHash) {
-          recordAttempt(limitKey, LOGIN_WINDOW_MS);
           throw new Error("Geen account gevonden met dit e-mailadres");
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
 
         if (!isValid) {
-          recordAttempt(limitKey, LOGIN_WINDOW_MS);
           throw new Error("Ongeldig wachtwoord");
         }
 
