@@ -277,7 +277,7 @@ function RestTimer({
         aria-label="Skip rest"
         className="mt-4 bg-[#baa3d0] text-[#141416] rounded-full px-6 py-2.5 font-editorial text-[15px] tracking-wider apple-press"
       >
-        OVERSLAAN
+        SKIP
       </button>
     </>
   );
