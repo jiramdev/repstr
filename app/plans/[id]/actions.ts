@@ -240,14 +240,17 @@ export async function reorderExercises(planId: string, orderedIds: string[]) {
     return { error: "Couldn't save the order." };
   }
 
-  await prisma.$transaction(
-    validIds.map((id, order) =>
-      prisma.planExercise.update({
-        where: { id },
-        data: { order },
-      })
-    )
-  );
+  // Two phases in one transaction: Postgres checks the unique
+  // (planId, order) per statement, so permuting in place would collide.
+  // Negative placeholders can never clash with real orders (>= 0).
+  await prisma.$transaction([
+    ...validIds.map((id, i) =>
+      prisma.planExercise.update({ where: { id }, data: { order: -(i + 1) } })
+    ),
+    ...validIds.map((id, order) =>
+      prisma.planExercise.update({ where: { id }, data: { order } })
+    ),
+  ]);
 
   refreshUserCache(session.user.id);
   revalidatePath(`/plans/${validPlanId}`);

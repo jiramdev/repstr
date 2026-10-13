@@ -10,8 +10,10 @@ const {
   planExerciseUpdate,
   planExerciseDelete,
   planExerciseDeleteMany,
+  planExerciseFindMany,
   scheduleDayDeleteMany,
   exerciseFindFirst,
+  prismaTransaction,
 } = vi.hoisted(() => ({
   workoutPlanFindFirst: vi.fn(),
   workoutPlanUpdate: vi.fn(),
@@ -20,8 +22,10 @@ const {
   planExerciseUpdate: vi.fn(),
   planExerciseDelete: vi.fn(),
   planExerciseDeleteMany: vi.fn(),
+  planExerciseFindMany: vi.fn(),
   scheduleDayDeleteMany: vi.fn(),
   exerciseFindFirst: vi.fn(),
+  prismaTransaction: vi.fn(),
 }));
 
 vi.mock("next-auth", () => ({ getServerSession }));
@@ -42,17 +46,18 @@ vi.mock("@/lib/prisma", () => ({
       update: planExerciseUpdate,
       delete: planExerciseDelete,
       deleteMany: planExerciseDeleteMany,
-      findMany: vi.fn(async () => []),
+      findMany: planExerciseFindMany,
     },
     scheduleDay: { deleteMany: scheduleDayDeleteMany },
     exercise: { findFirst: exerciseFindFirst },
-    $transaction: vi.fn(async (ops: unknown) => ops),
+    $transaction: prismaTransaction,
   },
 }));
 
 import {
   deletePlan,
   removeExerciseFromPlan,
+  reorderExercises,
   updateExercise,
   updatePlanName,
 } from "@/app/plans/[id]/actions";
@@ -101,5 +106,23 @@ describe("plan ownership", () => {
   it("rejects an invalid day and an overlong plan name", async () => {
     await expect(assignPlanToDay(7, null)).rejects.toThrow("Invalid day");
     expect(await createWorkoutPlan("x".repeat(81))).toBeNull();
+  });
+
+  it("reorders in two phases so the unique order never collides", async () => {
+    planExerciseFindMany.mockResolvedValue([{ id: "a" }, { id: "b" }, { id: "c" }]);
+    prismaTransaction.mockImplementation(async (ops: unknown) => ops);
+    const result = await reorderExercises("plan-a", ["c", "a", "b"]);
+    expect(result).toEqual({ success: true });
+    expect(prismaTransaction).toHaveBeenCalledTimes(1);
+    const ops = prismaTransaction.mock.calls[0][0] as unknown[];
+    // 3 temp writes (negative, collision-free) + 3 final writes.
+    expect(ops).toHaveLength(6);
+  });
+
+  it("rejects a reorder that drops or adds placements", async () => {
+    planExerciseFindMany.mockResolvedValue([{ id: "a" }, { id: "b" }]);
+    const result = await reorderExercises("plan-a", ["a", "b", "c"]);
+    expect(result).toEqual({ error: "Couldn't save the order." });
+    expect(prismaTransaction).not.toHaveBeenCalled();
   });
 });

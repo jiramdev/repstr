@@ -1,8 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, ArchiveRestore, Minus, Pencil, Plus } from "lucide-react";
+import { Archive, ArchiveRestore, Pencil, Plus } from "lucide-react";
 import { TRACKING_OPTIONS, type ExerciseTracking } from "@/lib/exercise-library";
+import {
+  CancelButton,
+  SaveButton,
+  Stepper,
+  TypeSegmented,
+  fieldLabelClass,
+} from "@/components/ExerciseFormFields";
 import { createExercise, setExerciseArchived, updateExerciseDetails } from "./actions";
 
 export interface LibraryItem {
@@ -19,17 +26,8 @@ function trackingLabel(tracking: ExerciseTracking) {
   return TRACKING_OPTIONS.find((option) => option.id === tracking)?.label ?? tracking;
 }
 
-function trackingHint(tracking: ExerciseTracking) {
-  if (tracking === "weight") return "Log the lifted weight in kg plus reps per set.";
-  if (tracking === "reps") return "Log reps per set using your own body weight.";
-  return "Log the held seconds per set.";
-}
-
 const fieldClass =
   "w-full bg-[#1b1b1e] border border-white/[0.04] rounded-2xl px-4 py-3 text-[14px] text-white placeholder-[#71717a] outline-none focus:border-[#baa3d0]";
-
-const labelClass =
-  "px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase";
 
 function parseOptionalInt(value: string, min: number, max: number): number | null | undefined {
   if (!value.trim()) return null;
@@ -43,108 +41,6 @@ function parseInt(value: string, min: number, max: number): number | null {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < min || parsed > max) return null;
   return parsed;
-}
-
-function Stepper({
-  label,
-  unit,
-  value,
-  placeholder,
-  min,
-  max,
-  onChange,
-}: {
-  label: string;
-  unit: string;
-  value: string;
-  placeholder?: string;
-  min: number;
-  max: number;
-  onChange: (value: string) => void;
-}) {
-  const current = value.trim() ? Number(value) : null;
-  function step(delta: number) {
-    if (current == null || !Number.isInteger(current)) {
-      onChange(String(delta > 0 ? min : max));
-      return;
-    }
-    const next = current + delta;
-    if (next < min) {
-      onChange("");
-      return;
-    }
-    if (next > max) return;
-    onChange(String(next));
-  }
-  return (
-    <div className="space-y-1">
-      <span className={labelClass}>{label}</span>
-      <div className="flex items-stretch gap-1.5">
-        <button
-          type="button"
-          onClick={() => step(-1)}
-          aria-label={`Decrease ${label}`}
-          className="w-11 shrink-0 bg-[#1b1b1e] border border-white/[0.04] rounded-2xl flex items-center justify-center text-[#a1a1aa] apple-press"
-        >
-          <Minus className="w-4 h-4" />
-        </button>
-        <div className="relative flex-1">
-          <input
-            type="text"
-            inputMode="numeric"
-            aria-label={label}
-            placeholder={placeholder}
-            value={value}
-            onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, ""))}
-            className="w-full bg-[#1b1b1e] border border-white/[0.04] rounded-2xl pl-4 pr-10 py-3 text-center text-[17px] font-semibold text-white placeholder-[#71717a] placeholder:text-[14px] placeholder:font-normal outline-none focus:border-[#baa3d0]"
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-[#71717a] pointer-events-none">
-            {unit}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={() => step(1)}
-          aria-label={`Increase ${label}`}
-          className="w-11 shrink-0 bg-[#1b1b1e] border border-white/[0.04] rounded-2xl flex items-center justify-center text-[#a1a1aa] apple-press"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function TypeSegmented({
-  value,
-  onChange,
-}: {
-  value: ExerciseTracking;
-  onChange: (tracking: ExerciseTracking) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <span className={labelClass}>Type</span>
-      <div className="grid grid-cols-3 gap-2" role="group" aria-label="Exercise type">
-        {TRACKING_OPTIONS.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            aria-pressed={value === option.id}
-            onClick={() => onChange(option.id)}
-            className={`py-2.5 rounded-2xl text-[11px] uppercase tracking-wider font-semibold apple-press ${
-              value === option.id
-                ? "bg-[#baa3d0] text-[#141416]"
-                : "bg-[#1b1b1e] border border-white/[0.04] text-[#a1a1aa]"
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-      <p className="px-1 text-[12px] leading-snug text-[#71717a]">{trackingHint(value)}</p>
-    </div>
-  );
 }
 
 export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] }) {
@@ -276,7 +172,7 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
         {isCreating && (
           <form onSubmit={handleCreate} className="space-y-3">
             <div className="space-y-1">
-              <span className={labelClass}>Name</span>
+              <span className={fieldLabelClass}>Name</span>
               <input
                 type="text"
                 placeholder="E.g. Squat"
@@ -348,7 +244,7 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
                 {editingId === item.id ? (
                   <form onSubmit={handleSave} className="space-y-3">
                     <div className="space-y-1">
-                      <span className={labelClass}>Name</span>
+                      <span className={fieldLabelClass}>Name</span>
                       <input
                         type="text"
                         value={editName}
@@ -389,19 +285,8 @@ export default function ExerciseLibrary({ initial }: { initial: LibraryItem[] })
                     />
                     {editError && <p className="text-[12px] text-red-300">{editError}</p>}
                     <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        className="flex-1 bg-[#baa3d0] text-[#141416] font-semibold py-3 rounded-2xl text-[12px] uppercase tracking-wider apple-press"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(null)}
-                        className="px-4 bg-[#141416] border border-white/[0.08] text-[#a1a1aa] py-3 rounded-2xl text-[12px] uppercase tracking-wider"
-                      >
-                        Cancel
-                      </button>
+                      <SaveButton>Save</SaveButton>
+                      <CancelButton onClick={() => setEditingId(null)} />
                     </div>
                     <button
                       type="button"

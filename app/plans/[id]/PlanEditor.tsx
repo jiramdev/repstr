@@ -1,8 +1,23 @@
 // app/plans/[id]/PlanEditor.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Plus, Trash2, Edit2, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2, Edit2, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   updatePlanName,
   addExerciseToPlan,
@@ -17,6 +32,13 @@ import {
   libraryMatch,
   type ExerciseTracking,
 } from "@/lib/exercise-library";
+import {
+  CancelButton,
+  SaveButton,
+  Stepper,
+  darkFieldClass,
+  fieldLabelClass,
+} from "@/components/ExerciseFormFields";
 
 interface ExerciseItem {
   id: string;
@@ -43,17 +65,6 @@ interface LibraryExercise {
   restSeconds?: number;
 }
 
-interface DragState {
-  id: string;
-  pointerId: number;
-  startIndex: number;
-  overIndex: number;
-  startY: number;
-  deltaY: number;
-  slot: number;
-  tops: number[];
-}
-
 interface PlanEditorProps {
   planId: string;
   initialName: string;
@@ -61,8 +72,40 @@ interface PlanEditorProps {
   library: LibraryExercise[];
 }
 
+const POINTER_SENSOR_OPTIONS = { activationConstraint: { distance: 6 } as const };
+const KEYBOARD_SENSOR_OPTIONS = {
+  coordinateGetter: sortableKeyboardCoordinates,
+};
+
 function targetUnit(tracking: ExerciseTracking) {
   return tracking === "hold" ? "sec" : "reps";
+}
+
+function SortableExerciseRow({
+  id,
+  children,
+}: {
+  id: string;
+  children: (handle: { attributes: object; listeners: object }) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    position: "relative" as const,
+    zIndex: isDragging ? 20 : undefined,
+    boxShadow: isDragging ? "0 16px 32px rgba(0,0,0,0.45)" : undefined,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-exercise-id={id}
+      className="bg-[#1b1b1e] border border-white/[0.04] rounded-2xl px-4 py-3"
+    >
+      {children({ attributes, listeners: listeners ?? {} })}
+    </div>
+  );
 }
 
 export default function PlanEditor({
@@ -72,17 +115,25 @@ export default function PlanEditor({
   library,
 }: PlanEditorProps) {
   const [name, setName] = useState(initialName);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
 
   const [items, setItems] = useState(exercises);
   const itemsRef = useRef(exercises);
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
-  const listRef = useRef<HTMLDivElement>(null);
-  const draggingRef = useRef(false);
-  const dragRef = useRef<DragState | null>(null);
-  const [drag, setDrag] = useState<DragState | null>(null);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const pointerSensor = useSensor(PointerSensor, POINTER_SENSOR_OPTIONS);
+  const keyboardSensor = useSensor(KeyboardSensor, KEYBOARD_SENSOR_OPTIONS);
+  const sensors = useMemo(
+    () => [pointerSensor, keyboardSensor],
+    [pointerSensor, keyboardSensor]
+  );
+  const persistChain = useRef<Promise<void>>(Promise.resolve());
+  const [syncedExercises, setSyncedExercises] = useState(exercises);
+  if (syncedExercises !== exercises && !activeDragId) {
+    setSyncedExercises(exercises);
+    setItems(exercises);
+  }
   const [isAddingExercise, setIsAddingExercise] = useState(false);
   const [exerciseName, setExerciseName] = useState("");
   const [tracking, setTracking] = useState<ExerciseTracking>("weight");
@@ -94,23 +145,10 @@ export default function PlanEditor({
   const [openId, setOpenId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [editTracking, setEditTracking] = useState<ExerciseTracking>("weight");
   const [editSets, setEditSets] = useState("");
   const [editRepGoal, setEditRepGoal] = useState("");
   const [editRest, setEditRest] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (draggingRef.current) return;
-    setItems(exercises);
-  }, [exercises]);
-
-  const handleSaveTitle = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setIsEditingTitle(false);
-    await updatePlanName(planId, name);
-  };
 
   function parseOptionalCount(value: string, min: number, max: number): number | null | undefined {
     if (!value.trim()) return null;
@@ -170,7 +208,6 @@ export default function PlanEditor({
   function startEdit(exercise: ExerciseItem) {
     setEditingId(exercise.id);
     setEditName(exercise.name);
-    setEditTracking(exercise.tracking ?? "weight");
     setEditSets(exercise.setsOverride != null ? String(exercise.setsOverride) : "");
     setEditRepGoal(exercise.repGoalOverride != null ? String(exercise.repGoalOverride) : "");
     setEditRest(exercise.restOverride != null ? String(exercise.restOverride) : "");
@@ -209,7 +246,7 @@ export default function PlanEditor({
       if (!confirmed) return;
     }
 
-    const result = await updateExercise(planId, editingId, editName, sets, rest, editTracking, goal);
+    const result = await updateExercise(planId, editingId, editName, sets, rest, undefined, goal);
     if (result?.error) {
       setEditError(result.error);
       return;
@@ -223,7 +260,6 @@ export default function PlanEditor({
           ? {
               ...exercise,
               name: editName.trim(),
-              tracking: editTracking,
               targetSets: resolvedSets,
               restSeconds: resolvedRest,
               repGoal: resolvedGoal,
@@ -238,100 +274,38 @@ export default function PlanEditor({
     setOpenId(null);
   };
 
-  function startDrag(event: React.PointerEvent<HTMLButtonElement>, index: number) {
-    if (event.button !== 0 || items.length < 2) return;
-    const list = listRef.current;
-    if (!list) return;
-    const rows = [...list.querySelectorAll<HTMLElement>("[data-exercise-id]")];
-    const listTop = list.getBoundingClientRect().top;
-    const tops = rows.map((row) => row.getBoundingClientRect().top - listTop);
-    const slot =
-      tops[index + 1] != null
-        ? tops[index + 1] - tops[index]
-        : tops[index] - (tops[index - 1] ?? tops[index]);
-
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const next: DragState = {
-      id: items[index].id,
-      pointerId: event.pointerId,
-      startIndex: index,
-      overIndex: index,
-      startY: event.clientY,
-      deltaY: 0,
-      slot,
-      tops,
-    };
-    draggingRef.current = true;
-    dragRef.current = next;
-    setDrag(next);
-  }
-
-  function moveDrag(event: React.PointerEvent<HTMLButtonElement>) {
-    const current = dragRef.current;
-    if (!current || event.pointerId !== current.pointerId || !listRef.current) return;
-    const y = event.clientY - listRef.current.getBoundingClientRect().top;
-    let overIndex = current.tops.length - 1;
-    for (let i = 0; i < current.tops.length; i++) {
-      const mid =
-        i < current.tops.length - 1
-          ? (current.tops[i] + current.tops[i + 1]) / 2
-          : current.tops[i] + current.slot / 2;
-      if (y < mid) {
-        overIndex = i;
-        break;
+  async function persistOrder(reordered: ExerciseItem[]) {
+    // Serialize persists: a double-fired drop must not run two overlapping
+    // reorder transactions (their temp orders would collide).
+    const run = persistChain.current.then(async () => {
+      itemsRef.current = reordered;
+      setItems(reordered);
+      try {
+        const result = await reorderExercises(
+          planId,
+          reordered.map((exercise) => exercise.id)
+        );
+        if (result?.error) setItems(exercises);
+      } catch {
+        setItems(exercises);
       }
-    }
-    const next = { ...current, overIndex, deltaY: event.clientY - current.startY };
-    dragRef.current = next;
-    setDrag(next);
+    });
+    persistChain.current = run.catch(() => {});
+    await run;
   }
 
-  async function endDrag(event: React.PointerEvent<HTMLButtonElement>) {
-    const current = dragRef.current;
-    if (!current || event.pointerId !== current.pointerId) return;
-    dragRef.current = null;
-    draggingRef.current = false;
-    setDrag(null);
-    if (current.startIndex === current.overIndex) return;
-
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setActiveDragId(null);
+    if (!over || active.id === over.id) return;
+    const ids = itemsRef.current.map((exercise) => exercise.id);
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    if (from === -1 || to === -1) return;
     const reordered = [...itemsRef.current];
-    const [moved] = reordered.splice(current.startIndex, 1);
-    reordered.splice(current.overIndex, 0, moved);
-    itemsRef.current = reordered;
-    setItems(reordered);
-    const result = await reorderExercises(
-      planId,
-      reordered.map((exercise) => exercise.id)
-    );
-    if (result?.error) setItems(exercises);
-  }
-
-  async function moveItem(index: number, direction: -1 | 1) {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= items.length) return;
-    const reordered = [...items];
-    const [moved] = reordered.splice(index, 1);
-    reordered.splice(nextIndex, 0, moved);
-    itemsRef.current = reordered;
-    setItems(reordered);
-    const result = await reorderExercises(
-      planId,
-      reordered.map((exercise) => exercise.id)
-    );
-    if (result?.error) setItems(exercises);
-  }
-
-  function dragShift(index: number) {
-    if (!drag) return 0;
-    if (index === drag.startIndex) return drag.deltaY;
-    if (drag.overIndex > drag.startIndex && index > drag.startIndex && index <= drag.overIndex) {
-      return -drag.slot;
-    }
-    if (drag.overIndex < drag.startIndex && index < drag.startIndex && index >= drag.overIndex) {
-      return drag.slot;
-    }
-    return 0;
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+    void persistOrder(reordered);
   }
 
   const handleDeleteExercise = async (exerciseId: string) => {
@@ -393,40 +367,37 @@ export default function PlanEditor({
   return (
     <div className="space-y-3.5">
       <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[11px] font-semibold tracking-[0.18em] text-[#baa3d0] uppercase">
-            Plan
-          </span>
-        </div>
-
-        {isEditingTitle ? (
-          <form onSubmit={handleSaveTitle} className="flex gap-2">
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!name.trim()) return;
+            await updatePlanName(planId, name);
+          }}
+          className="space-y-3"
+        >
+          <div className="space-y-1">
+            <span className={fieldLabelClass}>Plan name</span>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              autoFocus
-              className={`flex-1 ${fieldClass}`}
+              maxLength={80}
+              aria-label="Plan name"
+              className={darkFieldClass}
             />
-            <button
-              type="submit"
-              className="bg-[#baa3d0] text-[#141416] font-semibold px-4 rounded-2xl text-[12px] uppercase tracking-wider apple-press"
-            >
-              Save
-            </button>
-          </form>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setIsEditingTitle(true)}
-            className="w-full bg-[#1b1b1e] rounded-2xl px-4 py-3 flex items-center justify-between gap-3 border border-white/[0.04] apple-press"
-          >
-            <span className="text-[14px] font-medium text-white shrink-0">Name</span>
-            <span className="font-editorial text-[22px] text-[#baa3d0] tracking-wider leading-none truncate">
-              {name}
-            </span>
-          </button>
-        )}
+          </div>
+          <div className="flex gap-2">
+            <SaveButton>Save</SaveButton>
+            <CancelButton onClick={() => setName(initialName)} />
+          </div>
+        </form>
+        <button
+          type="button"
+          onClick={handleDeletePlan}
+          className="w-full text-center text-[12px] font-semibold text-red-300/70 py-1 apple-press"
+        >
+          Delete plan
+        </button>
       </section>
 
       <section className="bg-[#141416] border border-white/[0.08] rounded-[30px] p-5 space-y-3 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
@@ -582,126 +553,92 @@ export default function PlanEditor({
           </form>
         )}
 
-        <div ref={listRef} className="space-y-2 pt-1">
-          {items.length === 0 ? (
-            <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 flex items-center border border-white/[0.04]">
-              <span className="text-[14px] font-medium text-[#71717a]">No exercises yet</span>
-            </div>
-          ) : (
-            items.map((ex, idx) => (
-              <div
-                key={ex.id}
-                data-exercise-id={ex.id}
-                className={`bg-[#1b1b1e] border border-white/[0.04] rounded-2xl px-4 py-3 ${
-                  drag?.id === ex.id ? "shadow-[0_16px_32px_rgba(0,0,0,0.45)]" : ""
-                }`}
-                style={
-                  drag
-                    ? {
-                        position: "relative",
-                        zIndex: drag.id === ex.id ? 20 : 1,
-                        transform: `translateY(${dragShift(idx)}px)`,
-                        transition: drag.id === ex.id ? "none" : "transform 160ms ease",
-                      }
-                    : undefined
-                }
-              >
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={(event) => setActiveDragId(String(event.active.id))}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveDragId(null)}
+        >
+          <SortableContext
+            items={items.map((exercise) => exercise.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-2 pt-1">
+              {items.length === 0 ? (
+                <div className="bg-[#1b1b1e] rounded-2xl px-4 py-3 flex items-center border border-white/[0.04]">
+                  <span className="text-[14px] font-medium text-[#71717a]">No exercises yet</span>
+                </div>
+              ) : (
+                items.map((ex) => (
+                  <SortableExerciseRow key={ex.id} id={ex.id}>
+                    {(handle) => (
+                      <>
                 {editingId === ex.id ? (
-                  <form onSubmit={handleSaveExercise} className="space-y-2">
-                    <label className="block space-y-1">
-                      <span className="px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase">
-                        Name
-                      </span>
+                  <form onSubmit={handleSaveExercise} className="space-y-3">
+                    <div className="space-y-1">
+                      <span className={fieldLabelClass}>Name</span>
                       <input
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         autoFocus
+                        maxLength={80}
                         aria-label="Exercise name"
-                        className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white outline-none focus:border-[#baa3d0]"
+                        className={darkFieldClass}
                       />
-                    </label>
+                    </div>
                     <p className="px-1 text-[12px] leading-snug text-[#baa3d0]">
                       A different name applies to every plan and all past logs of this exercise.
                     </p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {TRACKING_OPTIONS.map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => setEditTracking(option.id)}
-                          className={`py-2.5 rounded-2xl text-[11px] uppercase tracking-wider font-semibold ${
-                            editTracking === option.id
-                              ? "bg-[#baa3d0] text-[#141416]"
-                              : "bg-[#141416] border border-white/[0.08] text-[#a1a1aa]"
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <label className="block space-y-1">
-                        <span className="px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase">
-                          Sets
-                        </span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          aria-label="Sets override, empty means default"
-                          placeholder={ex.defaultSets != null ? `Default ${ex.defaultSets}` : "Sets"}
-                          value={editSets}
-                          onChange={(e) => setEditSets(e.target.value.replace(/[^\d]/g, ""))}
-                          className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
-                        />
-                      </label>
-                      <label className="block space-y-1">
-                        <span className="px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase">
-                          Target ({targetUnit(editTracking)})
-                        </span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          aria-label="Target reps or seconds override, empty means default"
-                          placeholder={ex.defaultRepGoal != null ? `Default ${ex.defaultRepGoal}` : "Target"}
-                          value={editRepGoal}
-                          onChange={(e) => setEditRepGoal(e.target.value.replace(/[^\d]/g, ""))}
-                          className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
-                        />
-                      </label>
-                      <label className="block space-y-1">
-                        <span className="px-1 text-[10px] font-semibold tracking-[0.14em] text-[#71717a] uppercase">
-                          Rest (s)
-                        </span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          aria-label="Rest in seconds override, empty means default"
-                          placeholder={ex.defaultRest != null ? `Default ${ex.defaultRest}` : "Rest"}
-                          value={editRest}
-                          onChange={(e) => setEditRest(e.target.value.replace(/[^\d]/g, ""))}
-                          className="w-full bg-[#141416] border border-white/[0.08] rounded-2xl px-4 py-3 text-[14px] text-white text-center outline-none focus:border-[#baa3d0]"
-                        />
-                      </label>
-                    </div>
-                    <p className="px-1 text-[12px] leading-snug text-[#71717a]">
-                      Empty fields use the exercise default.
-                    </p>
+                    <Stepper
+                      label="Sets"
+                      unit="sets"
+                      value={editSets}
+                      placeholder={
+                        ex.defaultSets != null ? `Default: ${ex.defaultSets} sets` : "Sets"
+                      }
+                      min={1}
+                      max={20}
+                      onChange={setEditSets}
+                    />
+                    <Stepper
+                      label={ex.tracking === "hold" ? "Target (seconds)" : "Target (reps)"}
+                      unit={targetUnit(ex.tracking ?? "weight")}
+                      value={editRepGoal}
+                      placeholder={
+                        ex.defaultRepGoal != null
+                          ? `Default: ${ex.defaultRepGoal} ${targetUnit(ex.tracking ?? "weight")}`
+                          : "None"
+                      }
+                      min={1}
+                      max={10000}
+                      onChange={setEditRepGoal}
+                    />
+                    <Stepper
+                      label="Rest"
+                      unit="s"
+                      value={editRest}
+                      placeholder={ex.defaultRest != null ? `Default: ${ex.defaultRest} s` : "Rest"}
+                      min={0}
+                      max={600}
+                      onChange={setEditRest}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditSets("");
+                        setEditRepGoal("");
+                        setEditRest("");
+                      }}
+                      className="w-full text-center text-[12px] font-semibold text-[#baa3d0] apple-press"
+                    >
+                      Reset to default
+                    </button>
                     {editError && <p className="text-[12px] text-red-300">{editError}</p>}
                     <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        className="flex-1 bg-[#baa3d0] text-[#141416] font-semibold py-3 rounded-2xl text-[12px] uppercase tracking-wider apple-press"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(null)}
-                        className="px-4 bg-[#141416] border border-white/[0.08] text-[#a1a1aa] py-3 rounded-2xl text-[12px] uppercase tracking-wider"
-                      >
-                        Cancel
-                      </button>
+                      <SaveButton>Save</SaveButton>
+                      <CancelButton onClick={() => setEditingId(null)} />
                     </div>
                   </form>
                 ) : (
@@ -710,34 +647,12 @@ export default function PlanEditor({
                       <button
                         type="button"
                         aria-label="Drag to reorder"
-                        onPointerDown={(event) => startDrag(event, idx)}
-                        onPointerMove={moveDrag}
-                        onPointerUp={endDrag}
-                        onPointerCancel={endDrag}
+                        {...handle.attributes}
+                        {...handle.listeners}
                         className="w-6 h-8 flex items-center justify-center text-[#52525b] touch-none cursor-grab active:cursor-grabbing shrink-0"
                       >
                         <GripVertical className="w-4 h-4" />
                       </button>
-                      <div className="flex flex-col">
-                        <button
-                          type="button"
-                          aria-label={`${ex.name} up`}
-                          disabled={idx === 0}
-                          onClick={() => moveItem(idx, -1)}
-                          className="w-6 h-4 flex items-center justify-center text-[#71717a] disabled:opacity-30"
-                        >
-                          <ChevronUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`${ex.name} down`}
-                          disabled={idx === items.length - 1}
-                          onClick={() => moveItem(idx, 1)}
-                          className="w-6 h-4 flex items-center justify-center text-[#71717a] disabled:opacity-30"
-                        >
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
                       <button
                         type="button"
                         onClick={() => setOpenId((current) => (current === ex.id ? null : ex.id))}
@@ -782,19 +697,15 @@ export default function PlanEditor({
                     )}
                   </div>
                 )}
-              </div>
-            ))
-          )}
-        </div>
+                      </>
+                    )}
+                  </SortableExerciseRow>
+                ))
+              )}
+            </div>
+          </SortableContext>
+        </DndContext>
       </section>
-
-      <button
-        type="button"
-        onClick={handleDeletePlan}
-        className="w-full bg-[#141416] border border-white/[0.08] rounded-[30px] px-5 py-4 text-[14px] font-medium text-red-300 shadow-[0_12px_28px_rgba(0,0,0,0.2)] apple-press"
-      >
-        Delete plan
-      </button>
     </div>
   );
 }
