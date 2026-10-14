@@ -29,6 +29,14 @@ export default function LaunchScreen() {
       return;
     }
 
+    // Start the animation only once the overlay has actually painted, so the
+    // slide-in is fully visible even when the page takes a while to load.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.getElementById("boot-splash")?.classList.add("boot-go");
+      });
+    });
+
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const timer = window.setTimeout(() => {
       sessionStorage.setItem(BOOT_KEY, "1");

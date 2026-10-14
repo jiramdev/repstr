@@ -125,12 +125,16 @@ export default function RootLayout({
             width: 100%;
             height: auto;
           }
-          #boot-splash .boot-half-l {
-            opacity: 0;
-            animation: boot-slide-l 0.5s cubic-bezier(0.32, 0.72, 0, 1) 0.05s both;
-          }
+          /* The animation only starts once .boot-go is added after paint,
+             so the slide-in is fully visible even on slow loads. */
+          #boot-splash .boot-half-l,
           #boot-splash .boot-half-r {
             opacity: 0;
+          }
+          #boot-splash.boot-go .boot-half-l {
+            animation: boot-slide-l 0.5s cubic-bezier(0.32, 0.72, 0, 1) 0.05s both;
+          }
+          #boot-splash.boot-go .boot-half-r {
             animation: boot-slide-r 0.5s cubic-bezier(0.32, 0.72, 0, 1) 0.05s both;
           }
           @keyframes boot-slide-l {
@@ -141,25 +145,20 @@ export default function RootLayout({
             from { opacity: 0; transform: translateX(30%); }
             to { opacity: 1; transform: translateX(0); }
           }
+          /* The wordmark matches the static iOS splash pixel-for-pixel from
+             frame 0 and never moves: only the loop mark animates above it. */
           #boot-splash .boot-word {
             width: 45vw;
             max-width: 350px;
-            opacity: 0;
-            animation: boot-fade 0.5s ease-out 0.7s both;
           }
           #boot-splash .boot-word svg {
             display: block;
             width: 100%;
             height: auto;
           }
-          @keyframes boot-fade {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
           @media (prefers-reduced-motion: reduce) {
             #boot-splash .boot-half-l,
-            #boot-splash .boot-half-r,
-            #boot-splash .boot-word {
+            #boot-splash .boot-half-r {
               animation: none;
               opacity: 1;
               transform: none;

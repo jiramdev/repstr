@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { registerUser } from "@/app/actions/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Wordmark from "@/components/Wordmark";
 
 const fieldClass =
   "w-full bg-[#1b1b1e] border border-white/[0.08] rounded-2xl px-4 py-3 text-[15px] text-white outline-none focus:border-[#baa3d0] placeholder:text-[#52525b]";
@@ -49,7 +50,7 @@ export default function RegisterPage() {
     <div className="min-h-dvh bg-[#baa3d0] px-4 py-10 flex items-center justify-center select-none">
       <main className="w-full max-w-sm space-y-4">
         <div className="text-center pb-1">
-          <h1 className="brand-name text-[64px] text-[#141416] leading-none">repstr</h1>
+          <Wordmark className="mx-auto w-60 text-[#141416]" />
           <p className="mt-3 text-[14px] font-medium text-[#141416]/70">Every rep, counted.</p>
         </div>
 
