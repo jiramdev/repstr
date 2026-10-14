@@ -58,7 +58,13 @@ Vercel functions run in `fra1` (see `vercel.json`), next to the users in the Net
 3. Update `DATABASE_URL` in Vercel env vars (production) and locally.
 4. Redeploy and verify, then decommission the old database.
 
-Use a single Prisma client instance (`lib/prisma.ts`, module-level singleton reused by warm serverless functions). For serverless, point `DATABASE_URL` at a pooled connection string (PgBouncer, e.g. Supabase/Neon pooler) with a low connection limit (`connection_limit=1&pgbouncer=true`); use the direct URL only for migrations. Example shape: `postgresql://user:pass@<pooler-host>:6543/db?pgbouncer=true&connection_limit=1`. The analytics queries run sequentially on purpose so a tiny pool is never held by several queries at once.
+Use a single Prisma client instance (`lib/prisma.ts`, module-level singleton reused by warm serverless functions). The app uses two Postgres URLs (see `datasource db` in `prisma/schema.prisma`):
+
+- `DATABASE_URL` — Neon pooled URL used by the running app:
+  `postgresql://user:pass@<neon-pooler-host>/db?sslmode=require&pgbouncer=true&connection_limit=1`
+- `DIRECT_URL` — Neon direct (non-pooled) URL, used only by `prisma migrate deploy`.
+
+Set both in the Vercel env vars (production) and locally. The analytics queries run sequentially on purpose so a tiny pool is never held by several queries at once.
 
 ## Migrations on the existing production database
 
