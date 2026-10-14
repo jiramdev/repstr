@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const e2eEnv: Record<string, string> = {
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5433/workout_e2e",
+  DIRECT_URL: "postgresql://postgres:postgres@localhost:5433/workout_e2e",
   NEXTAUTH_SECRET: "e2e-test-secret-1234567890",
   NEXTAUTH_URL: "http://localhost:3100",
   APP_URL: "http://localhost:3100",

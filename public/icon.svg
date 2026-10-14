@@ -1,10 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="repiq">
-  <rect width="512" height="512" fill="#141416"/>
-  <g fill="#baa3d0">
-    <rect x="131" y="230" width="250" height="52" rx="26"/>
-    <rect x="108" y="138" width="48" height="236" rx="18"/>
-    <rect x="178" y="172" width="36" height="168" rx="14"/>
-    <rect x="356" y="138" width="48" height="236" rx="18"/>
-    <rect x="298" y="172" width="36" height="168" rx="14"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="113" fill="#BAA3D0"/><path fill="#141416" fill-rule="evenodd" d="M158.54 326.62 L187.78 294.14 L153.88 294.14 L222.53 217.86 L304.45 217.86 L333.68 185.38 L178.32 185.38 L51.2 326.62ZM333.68 326.62 L460.8 185.38 L353.46 185.38 L324.22 217.86 L358.12 217.86 L289.47 294.14 L207.55 294.14 L178.32 326.62Z"/></svg>

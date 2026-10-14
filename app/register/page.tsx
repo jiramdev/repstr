@@ -49,7 +49,7 @@ export default function RegisterPage() {
     <div className="min-h-dvh bg-[#baa3d0] px-4 py-10 flex items-center justify-center select-none">
       <main className="w-full max-w-sm space-y-4">
         <div className="text-center pb-1">
-          <h1 className="brand-name text-[64px] text-[#141416] leading-none">repiq</h1>
+          <h1 className="brand-name text-[64px] text-[#141416] leading-none">repstr</h1>
           <p className="mt-3 text-[14px] font-medium text-[#141416]/70">Every rep, counted.</p>
         </div>
 

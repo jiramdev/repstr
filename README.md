@@ -1,4 +1,4 @@
-# repiq
+# repstr
 
 Personal workout tracker (Dutch UI). Next.js 16 App Router, React 19, Prisma 6 on Postgres, next-auth v4 (email + password, JWT), QStash + web-push notifications, Tailwind 4, lucide-react, motion. Deployed on Vercel as project `workout-tracker` (team `jiram`).
 

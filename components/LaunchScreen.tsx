@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 const AUTH_ROUTES = ["/login", "/register"];
+const BOOT_KEY = "repstr-booted";
+const BOOT_MS = 1250;
 
 export default function LaunchScreen() {
   const pathname = usePathname();
@@ -22,20 +24,18 @@ export default function LaunchScreen() {
     started.current = true;
 
     const splash = document.getElementById("boot-splash");
-    if (sessionStorage.getItem("repiq-booted") === "1") {
+    if (sessionStorage.getItem(BOOT_KEY) === "1") {
       splash?.remove();
       return;
     }
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const bar = document.getElementById("boot-bar");
-    if (bar) bar.style.width = "100%";
     const timer = window.setTimeout(() => {
-      sessionStorage.setItem("repiq-booted", "1");
+      sessionStorage.setItem(BOOT_KEY, "1");
       splash?.remove();
       router.prefetch("/notifications");
       router.prefetch("/workout/active");
-    }, reduce ? 0 : 280);
+    }, reduce ? 300 : BOOT_MS);
     return () => window.clearTimeout(timer);
   }, [pathname, router]);
 

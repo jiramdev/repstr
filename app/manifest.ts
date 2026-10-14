@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "repiq",
-    short_name: "repiq",
+    name: "repstr",
+    short_name: "repstr",
     description: "Every rep, counted.",
     start_url: "/",
     display: "standalone",
